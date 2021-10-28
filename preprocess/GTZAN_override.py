@@ -9,7 +9,7 @@ from torchaudio.datasets.utils import (
     download_url,
     extract_archive,
 )
-
+# Load own data splits instead of the preset
 from xxMusic.Constants_new import *
 
 # The following lists prefixed with `filtered_` provide a filtered split

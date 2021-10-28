@@ -1,6 +1,6 @@
 import torch
 import torch.utils.data
-from preprocess.gtzan import GTZAN
+from preprocess.GTZAN_override import GTZAN
 from scipy import signal
 
 from xxMusic.Constants import *
