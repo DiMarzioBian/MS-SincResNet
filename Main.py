@@ -38,6 +38,7 @@ def main():
     opt.device = torch.device('cuda')
     opt.log = '_result/log/' + opt.version + time.strftime("-%b_%d_%H_%M", time.localtime()) + '.txt'
 
+    create_data_folders()
     with open(opt.log, 'w') as f:
         f.write('Epoch, Time, loss_tr, acc_tr, loss_val, acc_val, acc_val_voting\n')
 
@@ -80,6 +81,11 @@ def main():
 
     test(opt, model, testloader)
 
+def create_data_folders():
+    try:
+        os.makedirs('_data/GTZAN')
+    except:
+        pass
 
 def train(opt, model, trainloader, valloader, optimizer, scheduler):
 
