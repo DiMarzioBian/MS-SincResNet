@@ -157,6 +157,7 @@ class xxMusic(nn.Module):
             nn.AdaptiveAvgPool1d(1024))
         self.resnet = myResnet(pretrained=self.resnet_pretrained)
         self.calc_loss = LabelSmoothingLoss(0.1, 10)
+        # self.calc_loss = nn.CrossEntropyLoss()
 
     def forward(self, x):
         """ Feature extraction """
