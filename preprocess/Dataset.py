@@ -1,11 +1,12 @@
 import torch
 import torch.utils.data
-from preprocess.GTZAN_override import GTZAN
+from preprocess.GTZAN_override import GTZAN, load_gtzan_item
 from scipy import signal
-
+import random
+import numpy as np
 from xxMusic.Constants import *
 
-
+import torchaudio
 mapper_genre = {
     "blues": 0,
     "classical": 1,
@@ -33,6 +34,7 @@ class GTZAN_3s(torch.utils.data.Dataset):
         self.new_sr = new_sr  # 16000
         self.length = len(self.walker) * self.k_splits
 
+
     def __len__(self):
         return self.length
 
@@ -40,11 +42,15 @@ class GTZAN_3s(torch.utils.data.Dataset):
         """
         Each returned element is a tuple[data(torch.tensor), label(int)]
         """
+
         index_30, index_3 = divmod(index, self.k_splits)
         wave, sr, genre_str = self.walker[index_30]
         wave = signal.resample(wave.squeeze(0).detach().numpy(), self.new_sr * 30)
-        wave = wave[3 * index_3 * self.new_sr: 3 * (index_3+1) * self.new_sr]
+        wave = wave[3 * index_3 * self.new_sr: 3 * (index_3 + 1) * self.new_sr]
         wave = torch.from_numpy(wave).float().unsqueeze_(dim=0)
+        #augmentation
+        wave = torchaudio.transforms.Vol(gain=0.9, gain_type="amplitude")(wave)
+        wave = wave + 0.02 * np.random.normal(len(wave))
 
         return wave, mapper_genre[genre_str]
 
@@ -53,7 +59,6 @@ def get_GTZAN_dataloader(sample_rate, batch_size, num_workers):
     """ Load data and prepare dataloader. """
 
     train_data = GTZAN_3s(subset='training', new_sr=sample_rate)
-
     val_data = GTZAN_3s(subset='validation', new_sr=sample_rate)
 
     test_data = GTZAN_3s(subset='testing', new_sr=sample_rate)
