@@ -132,9 +132,9 @@ class SpatialPyramidPool2D(nn.Module):
         self.global_avg_pool = AdaptiveAvgPool2d(output_size=(1, 1))
 
     def forward(self, x):
-        #local
+        #local avg pooling, gives 512@2*2 feature
         first_pool = self.local_avg_pool(x)
-        #global
+        #global avg pooling, gives 512@1*1 feature
         second_pool = self.global_avg_pool(x)
         #flatten and concatenate
         out1 = first_pool.view(first_pool.size()[0], -1)
@@ -159,9 +159,10 @@ class myResnet(nn.Module):
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, x):
+        #[4, 10] change to 512@5×32
         x = self.features(x)
         gx = self.layer_next(x)
-        #pass through SPP module
+        #pass through SPP module, and get 2560-d feature vector
         x = self.spp(gx)
         x = torch.flatten(x, 1)
         #Pass through two fully connected layers
