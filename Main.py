@@ -8,14 +8,15 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from preprocess.Dataset import get_GTZAN_dataloader
+from preprocess.Dataset import get_dataloader
 from Epoch import train_epoch, test_epoch
+from Utils import adjust_learning_rate
 
 
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-version', type=str, default='0.0')
+    parser.add_argument('-version', type=str, default='0.1')
     parser.add_argument('-load_state', default=False)  # Provide state_dict path for testing or continue training
     parser.add_argument('-save_state', default=False)  # Saving best or latest model state_dict
     parser.add_argument('-test_only', default=False)  # Enable to skip training session
@@ -23,11 +24,14 @@ def main():
 
     parser.add_argument('-data', default='GTZAN')
     parser.add_argument('-sample_rate', type=int, default=16000)
+    parser.add_argument('-sigma_gnoise', type=float, default=0.004)
+    parser.add_argument('-smooth_label', type=float, default=0.3)
 
-    parser.add_argument('-epoch', type=int, default=30)
+    parser.add_argument('-epoch', type=int, default=150)
     parser.add_argument('-num_workers', type=int, default=2)
-    parser.add_argument('-batch_size', type=int, default=4)
-    parser.add_argument('-lr', type=float, default=1e-4)
+    parser.add_argument('-batch_size', type=int, default=2)
+    parser.add_argument('-manual_lr', default=True)
+    parser.add_argument('-lr', type=float, default=1e-4)  # Enable manual_lr will override this lr
     parser.add_argument('-lr_patience', type=int, default=10)
     parser.add_argument('-es_patience', type=int, default=10)
 
@@ -50,7 +54,8 @@ def main():
 
     # Import data
     print('\n[Info] Loading data...')
-    trainloader, valloader, testloader = get_GTZAN_dataloader(opt.sample_rate, opt.batch_size, opt.num_workers)
+    trainloader, valloader, testloader = get_dataloader('GTZAN', opt)
+    opt.num_label = trainloader.dataset.num_label
 
     # Load Music model
     model = xxMusic(opt)
@@ -63,9 +68,8 @@ def main():
     model.to(opt.device)
     model.eval()
 
-    optimizer = optim.Adam(filter(lambda x: x.requires_grad, model.parameters()),
-                           opt.lr, betas=(0.9, 0.999), eps=1e-05, weight_decay=1e-5)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, int(opt.lr_patience), gamma=0.5)
+    optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()), lr=opt.lr, momentum=0.9)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, int(opt.lr_patience), gamma=0.707)
 
     print('\n[Info] Model parameters:\n')
     for k, v in vars(opt).items():
@@ -77,8 +81,9 @@ def main():
     # Run model
     if not opt.test_only:
         train(opt, model, trainloader, valloader, optimizer, scheduler)
-
     test(opt, model, testloader)
+
+    print('\n------------------------ Finished. ------------------------\n')
 
 
 def train(opt, model, trainloader, valloader, optimizer, scheduler):
@@ -95,9 +100,15 @@ def train(opt, model, trainloader, valloader, optimizer, scheduler):
 
         """ Training """
         start = time.time()
+
+        if opt.manual_lr:
+            adjust_learning_rate(optimizer, epoch)
+
         loss_train, acc_train = train_epoch(model, trainloader, opt, optimizer)
         end = time.time()
-        scheduler.step()
+
+        if not opt.manual_lr:
+            scheduler.step()
 
         print('\n- (Training) Loss:{loss: 8.5f}, accuracy:{acc: 8.4f}, elapse:{elapse:3.4f} min'
               .format(loss=loss_train, acc=acc_train, elapse=(time.time() - start) / 60))
@@ -161,8 +172,6 @@ def test(opt, model, testloader):
     with open(opt.log, 'a') as f:
         f.write('\nTest loss:{loss: 8.4f}, accuracy:{acc: 8.4f}, voting accuracy:{voting: 8.4f}'
                 .format(acc=acc_test, loss=loss_test, voting=acc_test_voting), )
-
-    print('\n------------------------ Finished. ------------------------\n')
 
 
 if __name__ == '__main__':

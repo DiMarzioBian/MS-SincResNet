@@ -139,7 +139,7 @@ class xxMusic(nn.Module):
         super(xxMusic, self).__init__()
         self.resnet_pretrained = opt.resnet_pretrained
 
-        self.layerNorm = nn.LayerNorm([1, 48000])
+        self.layerNorm = nn.LayerNorm([1, 3*opt.sample_rate])
         self.sincNet1 = nn.Sequential(
             SincConv_fast(out_channels=160, kernel_size=251),
             nn.BatchNorm1d(160),
@@ -156,7 +156,7 @@ class xxMusic(nn.Module):
             nn.ReLU(inplace=True),
             nn.AdaptiveAvgPool1d(1024))
         self.resnet = myResnet(pretrained=self.resnet_pretrained)
-        self.calc_loss = LabelSmoothingLoss(0.1, 10)
+        self.calc_loss = LabelSmoothingLoss(opt.smooth_label, opt.num_label)
 
     def forward(self, x):
         """ Feature extraction """

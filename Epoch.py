@@ -17,11 +17,11 @@ def train_epoch(model, data, opt, optimizer):
     num_data = data.dataset.length
     num_pred_correct_epoch = 0
     loss_epoch = 0
+    model.train()
     for batch in tqdm(data, desc='- (Training)   ', leave=False):
         wave, y_gt = map(lambda x: x.to(opt.device), batch)
 
         """ training """
-        model.train()
         optimizer.zero_grad()
 
         loss_batch, num_pred_correct_batch = model.loss(wave, y_gt)
@@ -46,6 +46,7 @@ def test_epoch(model, data, opt, dataset):
     y_pred_epoch = torch.ones(data.dataset.length).to(opt.device) * (-1)
     i = 0
 
+    model.eval()
     for batch in tqdm(data, desc='- (Testing)   ', leave=False):
         wave, y_gt_batch = map(lambda x: x.to(opt.device), batch)
 
