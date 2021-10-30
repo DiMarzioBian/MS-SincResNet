@@ -128,8 +128,8 @@ class SpatialPyramidPool2D(nn.Module):
 
     def __init__(self):
         super(SpatialPyramidPool2D, self).__init__()
-        self.local_avg_pool = AdaptiveMaxPool2d(output_size=(2, 2))
-        self.global_avg_pool = AdaptiveMaxPool2d(output_size=(1, 1))
+        self.local_avg_pool = AdaptiveAvgPool2d(output_size=(2, 2))
+        self.global_avg_pool = AdaptiveAvgPool2d(output_size=(1, 1))
 
     def forward(self, x):
         #local
