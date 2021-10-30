@@ -148,6 +148,7 @@ class myResnet(nn.Module):
         self.model = models.resnet18(pretrained=True)
         arch = list(self.model.children())
         self.features = nn.Sequential(*arch[:3])
+        #conv5 layer
         self.layer_next = nn.Sequential(*arch[3:-2])
         self.avg_pooling = nn.AdaptiveAvgPool2d((1, 1))
         self.model.fc = nn.Linear(512, 10, bias=True)
