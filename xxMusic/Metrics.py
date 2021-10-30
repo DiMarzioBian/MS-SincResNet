@@ -26,6 +26,7 @@ class LabelSmoothingLoss(nn.Module):
         pred_i (FloatTensor): (batch_size) x n_classes
         gt_i (LongTensor): batch_size
         """
+
         one_hot = F.one_hot(y_gt, num_classes=self.num_label).float()
         one_hot_non_tgt = (1 - one_hot)
         one_hot_smooth = one_hot * (1 - self.eps) + one_hot_non_tgt * self.eps / self.num_label

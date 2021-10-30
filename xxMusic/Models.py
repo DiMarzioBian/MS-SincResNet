@@ -5,6 +5,7 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
+from torch.nn.modules.pooling import AdaptiveAvgPool2d, AdaptiveMaxPool2d
 
 from xxMusic.Metrics import LabelSmoothingLoss
 
@@ -123,14 +124,73 @@ class SincConv_fast(nn.Module):
                         groups=1)
 
 
+class SpatialPyramidPool2D(nn.Module):
+    """
+    Args:
+        out_side (tuple): Length of side in the pooling results of each pyramid layer.
+    Inputs:
+        - `input`: the input Tensor to invert ([batch, channel, width, height])
+    """
+
+    def __init__(self, out_side):
+        super(SpatialPyramidPool2D, self).__init__()
+        self.out_side = out_side
+
+    def forward(self, x):
+        # batch_size, c, h, w = x.size()
+        out = None
+        # for n in self.out_side:
+        #local
+        local_avg_pool = AdaptiveMaxPool2d(output_size=(2, 2))
+        y = local_avg_pool(x)
+
+        global_avg_pool = AdaptiveMaxPool2d(output_size=(1, 1))
+        y2 = global_avg_pool(x)
+        out = y.view(y.size()[0], -1)
+        out2 = y2.view(y.size()[0], -1)
+        final = torch.cat((out, out2), 1)
+        return final
+
 class myResnet(nn.Module):
     def __init__(self, pretrained=True):
         super(myResnet, self).__init__()
         self.model = models.resnet18(pretrained=True)
+        arch = list(self.model.children())
+        self.features = nn.Sequential(*arch[:3])
+        self.layer_next = nn.Sequential(*arch[3:-2])
+
+
+        self.avg_pooling = nn.AdaptiveAvgPool2d((1, 1))
+
         self.model.fc = nn.Linear(512, 10, bias=True)
 
+        self.c = 2048
+        pool_size = (1, 2, 6)
+        self.spp = SpatialPyramidPool2D(out_side=pool_size)
+        self.fc1 = nn.Linear(2560, 512)
+        self.fc2 = nn.Linear(512, 10)
+
+        self.dropout = nn.Dropout(0.5)
+
     def forward(self, x):
-        x = self.model(x)
+        # print(x.size())
+
+        x = self.features(x)
+        # print(" fe ", x.size())
+        gx = self.layer_next(x)
+        # print(" afte glayer ", gx.size())
+
+        # _, _, _, x = self.conv_base(x)
+        x = self.spp(gx)
+        x = torch.flatten(x, 1)
+        x = self.fc1(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.fc2(x)
+        # output = F.log_softmax(x, dim=1)
+
+        # x = torch.max(x, dim = 1)
         return x
 
 
@@ -156,7 +216,7 @@ class xxMusic(nn.Module):
             nn.ReLU(inplace=True),
             nn.AdaptiveAvgPool1d(1024))
         self.resnet = myResnet(pretrained=self.resnet_pretrained)
-        self.calc_loss = LabelSmoothingLoss(0.1, 10)
+        self.calc_loss = LabelSmoothingLoss(0.3, 10)
         # self.calc_loss = nn.CrossEntropyLoss()
 
     def forward(self, x):

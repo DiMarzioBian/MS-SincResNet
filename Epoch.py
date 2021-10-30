@@ -36,7 +36,7 @@ def train_epoch(model, data, opt, optimizer):
     return loss_epoch / num_data, num_pred_correct_epoch / num_data
 
 
-def test_epoch(model, data, opt, optimizer, dataset):
+def test_epoch(model, data, opt, dataset):
     """
     Give prediction on test set
     """
@@ -49,15 +49,15 @@ def test_epoch(model, data, opt, optimizer, dataset):
 
     for batch in tqdm(data, desc='- (Testing)   ', leave=False):
         wave, y_gt_batch = map(lambda x: x.to(opt.device), batch)
-        optimizer.zero_grad()
-        with torch.set_grad_enabled(False):
-            loss_batch, num_pred_correct_batch, y_pred_batch = model.predict(wave, y_gt_batch)
-            num_pred_correct_epoch += num_pred_correct_batch
-            loss_epoch += loss_batch
-            y_pred_epoch[i*data.batch_size: (i+1)*data.batch_size] = y_pred_batch
-            i += 1
+        # optimizer.zero_grad()
+        # with torch.set_grad_enabled(False):
+        loss_batch, num_pred_correct_batch, y_pred_batch = model.predict(wave, y_gt_batch)
+        num_pred_correct_epoch += num_pred_correct_batch
+        loss_epoch += loss_batch
+        y_pred_epoch[i*data.batch_size: (i+1)*data.batch_size] = y_pred_batch
+        i += 1
 
-            # Voting accuracy
-            # acc_voting = calc_voting_accuracy(y_pred_epoch, dataset)
-            acc_voting = 1
+        # Voting accuracy
+    acc_voting = calc_voting_accuracy(y_pred_epoch, dataset)
+        #acc_voting = 1
     return loss_epoch / num_data, num_pred_correct_epoch / num_data, acc_voting

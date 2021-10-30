@@ -10,25 +10,28 @@ import torch.optim as optim
 
 from preprocess.Dataset import get_GTZAN_dataloader
 from Epoch import train_epoch, test_epoch
+from Utils import adjust_learning_rate
 
 
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-version', type=str, default='0.0')
+    parser.add_argument('-version', type=str, default='0.1')
     parser.add_argument('-load_state', default=False)  # Provide state_dict path for testing or continue training
-    parser.add_argument('-load_state_model', default="_result/model/xxMusic-v0.0--Oct_29_05_50.pth")  # Provide state_dict path for testing or continue training
-    parser.add_argument('-save_state', default=True)  # Saving best or latest model state_dict
+    parser.add_argument('-save_state', default=False)  # Saving best or latest model state_dict
     parser.add_argument('-test_only', default=False)  # Enable to skip training session
     parser.add_argument('-test_original', default=False)  # Test the original pretrained MS-SincResNet
 
     parser.add_argument('-data', default='GTZAN')
     parser.add_argument('-sample_rate', type=int, default=16000)
+    parser.add_argument('-sigma_gnoise', type=float, default=0.004)
+    parser.add_argument('-smooth_label', type=float, default=0.3)
 
-    parser.add_argument('-epoch', type=int, default=30)
-    parser.add_argument('-num_workers', type=int, default=300)
+    parser.add_argument('-epoch', type=int, default=150)
+    parser.add_argument('-num_workers', type=int, default=100)
     parser.add_argument('-batch_size', type=int, default=4)
-    parser.add_argument('-lr', type=float, default=1e-4)
+    parser.add_argument('-manual_lr', default=False)
+    parser.add_argument('-lr', type=float, default=1e-4)  # Enable manual_lr will override this lr
     parser.add_argument('-lr_patience', type=int, default=10)
     parser.add_argument('-es_patience', type=int, default=10)
 
@@ -39,7 +42,6 @@ def main():
     opt.device = torch.device('cuda')
     opt.log = '_result/log/' + opt.version + time.strftime("-%b_%d_%H_%M", time.localtime()) + '.txt'
 
-    create_data_folders()
     with open(opt.log, 'w') as f:
         f.write('Epoch, Time, loss_tr, acc_tr, loss_val, acc_val, acc_val_voting\n')
 
@@ -47,28 +49,27 @@ def main():
     if opt.test_original:
         opt.save_state = False
         opt.test_only = True
-        # opt.load_state = "_trained/MS-SincResNet.tar"
-        opt.load_state_model = "_result/model/xxMusic-v0.0--Oct_29_05_50.pth"
+        opt.load_state = "_trained/MS-SincResNet.tar"
         opt.data = 'GTZAN'
 
     # Import data
     print('\n[Info] Loading data...')
-    trainloader, valloader, testloader = get_GTZAN_dataloader(opt.sample_rate, opt.batch_size, opt.num_workers)
+    trainloader, valloader, testloader = get_GTZAN_dataloader( opt)
+    opt.num_label = trainloader.dataset.num_label
 
     # Load Music model
     model = xxMusic(opt)
 
     if opt.load_state:
-        model.load_state_dict(torch.load(opt.load_state_model)['state_dict'])
+        model.load_state_dict(torch.load(opt.load_state)['state_dict'])
     else:
         model.initialize_weights()
 
     model.to(opt.device)
     model.eval()
 
-    optimizer = optim.Adam(filter(lambda x: x.requires_grad, model.parameters()),
-                           opt.lr, betas=(0.9, 0.999), eps=1e-05, weight_decay=1e-5)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, int(opt.lr_patience), gamma=0.1)
+    optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()), lr=opt.lr, momentum=0.9)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, int(opt.lr_patience), gamma=0.707)
 
     print('\n[Info] Model parameters:\n')
     for k, v in vars(opt).items():
@@ -80,15 +81,10 @@ def main():
     # Run model
     if not opt.test_only:
         train(opt, model, trainloader, valloader, optimizer, scheduler)
-
     test(opt, model, testloader)
 
-def create_data_folders():
-    try:
-        os.makedirs('_data/GTZAN')
-        os.makedirs('_result/model')
-    except:
-        pass
+    print('\n------------------------ Finished. ------------------------\n')
+
 
 def train(opt, model, trainloader, valloader, optimizer, scheduler):
 
@@ -104,16 +100,22 @@ def train(opt, model, trainloader, valloader, optimizer, scheduler):
 
         """ Training """
         start = time.time()
+
+        # if opt.manual_lr:
+        #     adjust_learning_rate(optimizer, epoch)
+
         loss_train, acc_train = train_epoch(model, trainloader, opt, optimizer)
         end = time.time()
-        scheduler.step()
+
+        if not opt.manual_lr:
+            scheduler.step()
 
         print('\n- (Training) Loss:{loss: 8.5f}, accuracy:{acc: 8.4f}, elapse:{elapse:3.4f} min'
               .format(loss=loss_train, acc=acc_train, elapse=(time.time() - start) / 60))
 
         """ Validating """
         with torch.no_grad():
-         loss_val, acc_val, acc_val_voting = test_epoch(model, valloader, opt,optimizer, dataset='val')
+            loss_val, acc_val, acc_val_voting = test_epoch(model, valloader, opt, dataset='val')
 
         print('\n- (Validating) Loss:{loss: 8.5f}, accuracy:{acc: 8.4f} and voting accuracy:{voting: 8.4f}'
               .format(loss=loss_val, acc=acc_val, voting=acc_val_voting))
@@ -125,13 +127,6 @@ def train(opt, model, trainloader, valloader, optimizer, scheduler):
                     .format(epoch=epoch, time=(end - start) / 60, loss_train=loss_train, acc_train=acc_train,
                             loss_val=loss_val, acc_val=acc_val, acc_val_voting=acc_val_voting), )
 
-        model_best = model.state_dict().copy()
-
-        model.load_state_dict(model_best)
-        if opt.save_state:
-            print(" saving model ")
-            torch.save(model_best, '_result/model/xxMusic-v' + opt.version + '-' +
-                       time.strftime("-%b_%d_%H_%M", time.localtime()) + '.pth')
         """ Early stopping """
         if best_acc < acc_val:
             best_acc = acc_val
@@ -161,7 +156,6 @@ def train(opt, model, trainloader, valloader, optimizer, scheduler):
 
     model.load_state_dict(model_best)
     if opt.save_state:
-        print(" saving model ")
         torch.save(model_best, '_result/model/xxMusic-v' + opt.version + '-' +
                    time.strftime("-%b_%d_%H_%M", time.localtime()) + '.pth')
 
@@ -178,8 +172,6 @@ def test(opt, model, testloader):
     with open(opt.log, 'a') as f:
         f.write('\nTest loss:{loss: 8.4f}, accuracy:{acc: 8.4f}, voting accuracy:{voting: 8.4f}'
                 .format(acc=acc_test, loss=loss_test, voting=acc_test_voting), )
-
-    print('\n------------------------ Finished. ------------------------\n')
 
 
 if __name__ == '__main__':
