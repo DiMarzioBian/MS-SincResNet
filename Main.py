@@ -128,7 +128,7 @@ def train(opt, model, trainloader, valloader, optimizer, scheduler):
                             loss_val=loss_val, acc_val=acc_val, acc_val_voting=acc_val_voting), )
 
         """ Early stopping """
-        if best_acc < acc_val:
+        if best_acc_voting < acc_val_voting:
             best_acc = acc_val
             best_loss = loss_val
             best_acc_voting = acc_val_voting
