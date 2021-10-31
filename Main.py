@@ -24,18 +24,18 @@ def main():
 
     parser.add_argument('-data', default='GTZAN')
     parser.add_argument('-sample_rate', type=int, default=16000)
-    parser.add_argument('-hop_gap', type=float, default=0.5)
-    parser.add_argument('-splits_per_track', type=int, default=4)
+    parser.add_argument('-hop_gap', type=float, default=0.5)  # time gap between each adjacent splits in a track
+    parser.add_argument('-splits_per_track', type=int, default=4)  # Random sample some splits instead of using all
     parser.add_argument('-sigma_gnoise', type=float, default=0.004)
     parser.add_argument('-smooth_label', type=float, default=0.3)
 
     parser.add_argument('-epoch', type=int, default=1)
     parser.add_argument('-num_workers', type=int, default=2)
     parser.add_argument('-batch_size', type=int, default=2)
-    parser.add_argument('-manual_lr', default=True)
+    parser.add_argument('-manual_lr', default=False)
     parser.add_argument('-lr', type=float, default=1e-4)  # Enable manual_lr will override this lr
     parser.add_argument('-lr_patience', type=int, default=10)
-    parser.add_argument('-es_patience', type=int, default=10)
+    parser.add_argument('-es_patience', type=int, default=15)
 
     parser.add_argument('-resnet_pretrained', default=True)
     # parser.add_argument('-resnet_freeze', default=False)
