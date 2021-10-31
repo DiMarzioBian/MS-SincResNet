@@ -24,6 +24,8 @@ def main():
 
     parser.add_argument('-data', default='GTZAN')
     parser.add_argument('-sample_rate', type=int, default=16000)
+    parser.add_argument('-hop_gap', type=float, default=0.5)
+    parser.add_argument('-splits_per_track', type=int, default=4)
     parser.add_argument('-sigma_gnoise', type=float, default=0.004)
     parser.add_argument('-smooth_label', type=float, default=0.3)
 

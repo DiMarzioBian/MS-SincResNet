@@ -1,5 +1,6 @@
 import os
 from typing import Tuple, Optional, Union
+import random
 
 from scipy import signal
 import torch
@@ -52,6 +53,8 @@ class GTZAN_3s(Dataset):
                  subset: str,
                  new_sr: int,
                  sigma_gnoise: int = 0,
+                 hop_gap: float = 0.5,
+                 splits_per_track: int = 4,
                  root: str = '_data/GTZAN/',
                  download: bool = False,
                  url: str = URL):
@@ -65,11 +68,13 @@ class GTZAN_3s(Dataset):
         self.old_sr = 22050
         self.new_sr = new_sr  # 16000
         self.sigma_gnoise = sigma_gnoise
+        self.hop_gap = hop_gap
+        self.splits_per_track = splits_per_track
         self.download = download
         self.url = url
 
         self.num_label = len(mapper_genre)
-        self.k_splits = 10
+        self.total_splits = int(30.5 // (3+hop_gap))
         self._ext_audio = ".wav"
 
         archive = os.path.basename(url)
@@ -95,7 +100,15 @@ class GTZAN_3s(Dataset):
                 self._walker = filtered_valid
             elif self.subset == "testing":
                 self._walker = filtered_test
-        self.length = len(self._walker) * self.k_splits
+
+        if self.splits_per_track > self.total_splits:
+            self.splits_per_track = self.total_splits
+
+        self.length = len(self._walker) * self.splits_per_track
+
+        self.table_random = [[]] * len(self._walker)
+        for i in range(len(self._walker)):
+            self.table_random[i] = random.sample(range(self.total_splits), self.splits_per_track)
 
     def __len__(self):
         return self.length
@@ -104,17 +117,25 @@ class GTZAN_3s(Dataset):
         """
         Each returned element is a tuple[data(torch.tensor), label(int)]
         """
-        index_30, index_3 = divmod(index, self.k_splits)
-        wave, sr, genre_str = load_gtzan_item(self._walker[index_30], self._path, self._ext_audio)
+        index_full, index_table_split = divmod(index, self.splits_per_track)
+        index_split = self.table_random[index_full][index_table_split]
+
+        wave, sr, genre_str = load_gtzan_item(self._walker[index_full], self._path, self._ext_audio)
         wave = signal.resample(wave.squeeze(0).detach().numpy(), self.new_sr * 30)
-        wave = wave[3 * index_3 * self.new_sr: 3 * (index_3+1) * self.new_sr]
-        wave = torch.from_numpy(wave).float().unsqueeze_(dim=0)
+
+        start = int((3+self.hop_gap) * index_split * self.new_sr)
+        end = int(start + 3*self.new_sr)
+        wave = torch.from_numpy(wave[start: end]).float().unsqueeze_(dim=0)
 
         # augmentation
         wave = torchaudio.transforms.Vol(gain=0.9, gain_type="amplitude")(wave)
         wave += torch.randn(wave.shape[-1]).unsqueeze(0) * self.sigma_gnoise
 
         return wave, mapper_genre[genre_str]
+
+    def shuffle(self):
+        for i in range(len(self._walker)):
+            self.table_random[i] = random.sample(range(self.total_splits), self.splits_per_track)
 
 
 def get_GTZAN_dataloader(opt: argparse.Namespace):
@@ -123,12 +144,14 @@ def get_GTZAN_dataloader(opt: argparse.Namespace):
     sigma_gnoise = opt.sigma_gnoise
     batch_size = opt.batch_size
     num_workers = opt.num_workers
+    hop_gap = opt.hop_gap
+    splits_per_track = opt.splits_per_track
 
-    train_data = GTZAN_3s(subset='training', new_sr=new_sr, sigma_gnoise=sigma_gnoise)
+    train_data = GTZAN_3s(subset='training', new_sr=new_sr, sigma_gnoise=sigma_gnoise, hop_gap=hop_gap, splits_per_track=splits_per_track)
 
-    val_data = GTZAN_3s(subset='validation', new_sr=new_sr, sigma_gnoise=sigma_gnoise)
+    val_data = GTZAN_3s(subset='validation', new_sr=new_sr, sigma_gnoise=sigma_gnoise, hop_gap=hop_gap, splits_per_track=splits_per_track)
 
-    test_data = GTZAN_3s(subset='testing', new_sr=new_sr, sigma_gnoise=sigma_gnoise)
+    test_data = GTZAN_3s(subset='testing', new_sr=new_sr, sigma_gnoise=sigma_gnoise, hop_gap=hop_gap, splits_per_track=splits_per_track)
 
     trainloader = DataLoader(train_data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
 
