@@ -54,7 +54,7 @@ class GTZAN_3s(Dataset):
                  new_sr: int,
                  sigma_gnoise: int = 0,
                  hop_gap: float = 0.5,
-                 splits_per_track: int = 4,
+                 splits_per_track: int = 100,
                  root: str = '_data/GTZAN/',
                  download: bool = False,
                  url: str = URL):
@@ -74,7 +74,7 @@ class GTZAN_3s(Dataset):
         self.url = url
 
         self.num_label = len(mapper_genre)
-        self.total_splits = int(30.5 // (3+hop_gap))
+        self.total_num_splits = int(30.5 // (3+hop_gap))
         self._ext_audio = ".wav"
 
         archive = os.path.basename(url)
@@ -101,14 +101,11 @@ class GTZAN_3s(Dataset):
             elif self.subset == "testing":
                 self._walker = filtered_test
 
-        if self.splits_per_track > self.total_splits:
-            self.splits_per_track = self.total_splits
-
         self.length = len(self._walker) * self.splits_per_track
 
         self.table_random = [[]] * len(self._walker)
         for i in range(len(self._walker)):
-            self.table_random[i] = random.sample(range(self.total_splits), self.splits_per_track)
+            self.table_random[i] = random.sample(range(self.total_num_splits), self.splits_per_track)
 
     def __len__(self):
         return self.length
@@ -135,29 +132,30 @@ class GTZAN_3s(Dataset):
 
     def shuffle(self):
         for i in range(len(self._walker)):
-            self.table_random[i] = random.sample(range(self.total_splits), self.splits_per_track)
+            self.table_random[i] = random.sample(range(self.total_num_splits), self.splits_per_track)
 
 
 def get_GTZAN_dataloader(opt: argparse.Namespace):
     """ Load data and prepare dataloader. """
-    new_sr = opt.sample_rate
-    sigma_gnoise = opt.sigma_gnoise
-    batch_size = opt.batch_size
-    num_workers = opt.num_workers
-    hop_gap = opt.hop_gap
-    splits_per_track = opt.splits_per_track
 
-    train_data = GTZAN_3s(subset='training', new_sr=new_sr, sigma_gnoise=sigma_gnoise, hop_gap=hop_gap, splits_per_track=splits_per_track)
+    opt.total_num_splits = int(30.5 // (3 + opt.hop_gap))
+    if opt.splits_per_track > opt.total_num_splits:
+        opt.splits_per_track = opt.total_num_splits
 
-    val_data = GTZAN_3s(subset='validation', new_sr=new_sr, sigma_gnoise=sigma_gnoise, hop_gap=hop_gap, splits_per_track=splits_per_track)
+    train_data = GTZAN_3s(subset='training', new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise, hop_gap=opt.hop_gap,
+                          splits_per_track=opt.splits_per_track)
 
-    test_data = GTZAN_3s(subset='testing', new_sr=new_sr, sigma_gnoise=sigma_gnoise, hop_gap=hop_gap, splits_per_track=splits_per_track)
+    val_data = GTZAN_3s(subset='validation', new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise, hop_gap=opt.hop_gap,
+                        splits_per_track=opt.total_num_splits)
 
-    trainloader = DataLoader(train_data, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+    test_data = GTZAN_3s(subset='testing', new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise, hop_gap=opt.hop_gap,
+                         splits_per_track=opt.total_num_splits)
 
-    valloader = DataLoader(val_data, batch_size=batch_size, num_workers=num_workers, shuffle=False)
+    trainloader = DataLoader(train_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=True)
 
-    testloader = DataLoader(test_data, batch_size=batch_size, num_workers=num_workers, shuffle=False)
+    valloader = DataLoader(val_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=False)
+
+    testloader = DataLoader(test_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=False)
 
     return trainloader, valloader, testloader
 

@@ -57,6 +57,6 @@ def test_epoch(model, data, opt, dataset):
         i += 1
 
     # Voting accuracy
-    acc_voting = calc_voting_accuracy(y_pred_epoch, dataset)
+    acc_voting = calc_voting_accuracy(y_pred_epoch, dataset, opt.total_num_splits)
 
     return loss_epoch / num_data, num_pred_correct_epoch / num_data, acc_voting
