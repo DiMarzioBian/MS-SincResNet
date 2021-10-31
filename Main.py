@@ -108,6 +108,7 @@ def train(opt, model, trainloader, valloader, optimizer, scheduler):
 
         loss_train, acc_train = train_epoch(model, trainloader, opt, optimizer)
         end = time.time()
+        trainloader.dataset.shuffle()
 
         if not opt.manual_lr:
             scheduler.step()
