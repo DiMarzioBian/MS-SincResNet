@@ -20,7 +20,7 @@ def main():
     parser.add_argument('-load_state', default=False)  # Provide state_dict path for testing or continue training
     parser.add_argument('-save_state', default=False)  # Saving best or latest model state_dict
     parser.add_argument('-test_only', default=False)  # Enable to skip training session
-    parser.add_argument('-test_original', default=True)  # Deprecated, model structure has changed
+    parser.add_argument('-test_original', default=False)  # Deprecated, model structure has changed
 
     parser.add_argument('-data', default='GTZAN')
     parser.add_argument('-sample_rate', type=int, default=16000)
