@@ -27,7 +27,7 @@ def main():
     parser.add_argument('-sigma_gnoise', type=float, default=0.004)
     parser.add_argument('-smooth_label', type=float, default=0.3)
 
-    parser.add_argument('-epoch', type=int, default=150)
+    parser.add_argument('-epoch', type=int, default=1)
     parser.add_argument('-num_workers', type=int, default=2)
     parser.add_argument('-batch_size', type=int, default=2)
     parser.add_argument('-manual_lr', default=True)

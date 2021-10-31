@@ -126,12 +126,35 @@ class SincConv_fast(nn.Module):
 class myResnet(nn.Module):
     def __init__(self, pretrained=True):
         super(myResnet, self).__init__()
-        self.model = models.resnet18(pretrained=True)
-        self.model.fc = nn.Linear(512, 10, bias=True)
+
+        arch = list(models.resnet18(pretrained=True).children())
+        self.model_1to4 = nn.Sequential(*arch[:-3])
+        self.conv5_1 = arch[-3:-2][0][0]
+        self.conv5_2 = nn.Sequential(*list(arch[-3:-2][0][1].children())[:-1])
 
     def forward(self, x):
-        x = self.model(x)
+        x = self.model_1to4(x)
+        x = self.conv5_1(x)
+        x = self.conv5_2(x)
         return x
+
+
+class SpatialPyramidPool2D(nn.Module):
+
+    def __init__(self):
+        super(SpatialPyramidPool2D, self).__init__()
+        self.local_avg_pool = nn.AdaptiveAvgPool2d(output_size=(2, 2))
+        self.global_avg_pool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+
+    def forward(self, x):
+        # local avg pooling, gives 512@2*2 feature
+        features_local = self.local_avg_pool(x)
+        # global avg pooling, gives 512@1*1 feature
+        features_pool = self.global_avg_pool(x)
+        # flatten and concatenate
+        out1 = features_local.view(features_local.size()[0], -1)
+        out2 = features_pool.view(features_pool.size()[0], -1)
+        return torch.cat((out1, out2), 1)
 
 
 class xxMusic(nn.Module):
@@ -156,6 +179,14 @@ class xxMusic(nn.Module):
             nn.ReLU(inplace=True),
             nn.AdaptiveAvgPool1d(1024))
         self.resnet = myResnet(pretrained=self.resnet_pretrained)
+        self.spp = SpatialPyramidPool2D()
+        self.mlp = nn.Sequential(
+            nn.Linear(2560, 256, bias=True),
+            nn.BatchNorm1d(256, eps=1e-05, momentum=0.1),
+            nn.ReLU(inplace=True),
+            nn.Linear(256, 10, bias=True),
+        )
+
         self.calc_loss = LabelSmoothingLoss(opt.smooth_label, opt.num_label)
 
     def forward(self, x):
@@ -170,6 +201,8 @@ class xxMusic(nn.Module):
                        feat2.unsqueeze_(dim=1),
                        feat3.unsqueeze_(dim=1)), dim=1)
         x = self.resnet(x)
+        x = self.spp(x)
+        x = self.mlp(x)
         return x, feat1, feat2, feat3
 
     def loss(self, wave, y_gt):
@@ -190,8 +223,8 @@ class xxMusic(nn.Module):
 
     def initialize_weights(self):
         """ Initialize weights """
-        torch.nn.init.normal_(self.resnet.model.fc.weight.data, 0, 0.01)
-        self.resnet.model.fc.bias.data.zero_()
+        # torch.nn.init.normal_(self.resnet.model.fc.weight.data, 0, 0.01)
+        # self.resnet.model.fc.bias.data.zero_()
 
         num_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print('\n[Info] Number of parameters: {}'.format(num_params))
