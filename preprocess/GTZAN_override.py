@@ -9,6 +9,7 @@ from torchaudio.datasets.utils import (
     download_url,
     extract_archive,
 )
+import librosa
 # Load own data splits instead of the preset
 from xxMusic.Constants_new import *
 
@@ -51,11 +52,9 @@ def load_gtzan_item(fileid: str, path: str, ext_audio: str) -> Tuple[Tensor, str
     """
     # Filenames are of the form label.id, e.g. blues.00078
     label, _ = fileid.split(".")
-
     # Read wav
     file_audio = os.path.join(path, label, fileid + ext_audio)
     waveform, sample_rate = torchaudio.load(file_audio)
-
     return waveform, sample_rate, label
 
 

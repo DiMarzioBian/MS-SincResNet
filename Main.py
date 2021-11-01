@@ -4,11 +4,13 @@ import os
 import argparse
 import numpy as np
 import time
+from sklearn.model_selection import StratifiedKFold
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from preprocess.Dataset import get_GTZAN_dataloader
+from preprocess.Dataset import get_dataloader
+from preprocess.Dataset_GTZAN import get_dataset, get_GTZAN_labels_list, get_fold_dataloader
 from Epoch import train_epoch, test_epoch
 from Utils import adjust_learning_rate
 
@@ -16,24 +18,27 @@ from Utils import adjust_learning_rate
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-version', type=str, default='0.1')
+    parser.add_argument('-version', type=str, default='0.4')
     parser.add_argument('-load_state', default=False)  # Provide state_dict path for testing or continue training
     parser.add_argument('-save_state', default=False)  # Saving best or latest model state_dict
     parser.add_argument('-test_only', default=False)  # Enable to skip training session
-    parser.add_argument('-test_original', default=False)  # Test the original pretrained MS-SincResNet
+    parser.add_argument('-test_original', default=False)  # Deprecated, model structure has changed
 
     parser.add_argument('-data', default='GTZAN')
     parser.add_argument('-sample_rate', type=int, default=16000)
+    parser.add_argument('-hop_gap', type=float, default=0.5)  # time gap between each adjacent splits in a track
+    parser.add_argument('-splits_per_track', type=int, default=4)  # Random sample some splits instead of using all
+    parser.add_argument('-total_num_splits', type=int, default=4)  # Random sample some splits instead of using all
     parser.add_argument('-sigma_gnoise', type=float, default=0.004)
     parser.add_argument('-smooth_label', type=float, default=0.3)
 
-    parser.add_argument('-epoch', type=int, default=150)
+    parser.add_argument('-epoch', type=int, default=10)
     parser.add_argument('-num_workers', type=int, default=100)
     parser.add_argument('-batch_size', type=int, default=4)
     parser.add_argument('-manual_lr', default=False)
     parser.add_argument('-lr', type=float, default=1e-4)  # Enable manual_lr will override this lr
     parser.add_argument('-lr_patience', type=int, default=10)
-    parser.add_argument('-es_patience', type=int, default=10)
+    parser.add_argument('-es_patience', type=int, default=15)
 
     parser.add_argument('-resnet_pretrained', default=True)
     # parser.add_argument('-resnet_freeze', default=False)
@@ -52,36 +57,51 @@ def main():
         opt.load_state = "_trained/MS-SincResNet.tar"
         opt.data = 'GTZAN'
 
-    # Import data
-    print('\n[Info] Loading data...')
-    trainloader, valloader, testloader = get_GTZAN_dataloader( opt)
-    opt.num_label = trainloader.dataset.num_label
+    data, _, _ = get_dataset()
+    data = np.array(data)
+    labels, train_labels, val_labels = get_GTZAN_labels_list()
+    labels = np.array(labels)
+    splitter = StratifiedKFold(n_splits=10,  shuffle=True)
+    fold = 1
+    for train_index, test_index in splitter.split(data, labels):
+        print(f'FOLD {fold}')
+        print('--------------------------------')
+        x_train_fold = data[train_index]
+        x_test_fold = data[test_index]
+        train_d = get_fold_dataloader('training', x_train_fold, opt)
+        test_d = get_fold_dataloader('validation', x_test_fold, opt)
+        trainloader = torch.utils.data.DataLoader(train_d, batch_size=opt.batch_size, shuffle=True, num_workers = opt.num_workers)
+        valloader = torch.utils.data.DataLoader(test_d, batch_size=opt.batch_size, shuffle=False, num_workers = opt.num_workers)
 
-    # Load Music model
-    model = xxMusic(opt)
+        print('\n[Info] Loading data...')
+        # opt.num_label = trainloader.dataset.num_label
 
-    if opt.load_state:
-        model.load_state_dict(torch.load(opt.load_state)['state_dict'])
-    else:
-        model.initialize_weights()
+        # Load Music model
+        model = xxMusic(opt)
 
-    model.to(opt.device)
-    model.eval()
+        if opt.load_state:
+            model.load_state_dict(torch.load(opt.load_state)['state_dict'])
+        else:
+            model.initialize_weights()
 
-    optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()), lr=opt.lr, momentum=0.9)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, int(opt.lr_patience), gamma=0.707)
+        model.to(opt.device)
+        model.eval()
 
-    print('\n[Info] Model parameters:\n')
-    for k, v in vars(opt).items():
-        print('         %s: %s' % (k, v))
+        optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()), lr=opt.lr, momentum=0.9)
+        scheduler = optim.lr_scheduler.StepLR(optimizer, int(opt.lr_patience), gamma=0.707)
 
-    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print('\n[Info] Number of parameters:{}'.format(num_params))
+        print('\n[Info] Model parameters:\n')
+        for k, v in vars(opt).items():
+            print('         %s: %s' % (k, v))
 
-    # Run model
-    if not opt.test_only:
-        train(opt, model, trainloader, valloader, optimizer, scheduler)
-    test(opt, model, testloader)
+        num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print('\n[Info] Number of parameters:{}'.format(num_params))
+
+        # Run model
+        if not opt.test_only:
+             train(opt, model, trainloader, valloader, optimizer, scheduler)
+    # test(opt, model, testloader)
+        fold = fold + 1
 
     print('\n------------------------ Finished. ------------------------\n')
 
@@ -101,11 +121,12 @@ def train(opt, model, trainloader, valloader, optimizer, scheduler):
         """ Training """
         start = time.time()
 
-        # if opt.manual_lr:
-        #     adjust_learning_rate(optimizer, epoch)
+        if opt.manual_lr:
+            adjust_learning_rate(optimizer, epoch)
 
         loss_train, acc_train = train_epoch(model, trainloader, opt, optimizer)
         end = time.time()
+        # trainloader.dataset.shuffle()
 
         if not opt.manual_lr:
             scheduler.step()
@@ -115,7 +136,7 @@ def train(opt, model, trainloader, valloader, optimizer, scheduler):
 
         """ Validating """
         with torch.no_grad():
-            loss_val, acc_val, acc_val_voting = test_epoch(model, valloader, opt, dataset='val')
+            loss_val, acc_val, acc_val_voting = test_epoch(model, valloader, opt, optimizer, dataset='val')
 
         print('\n- (Validating) Loss:{loss: 8.5f}, accuracy:{acc: 8.4f} and voting accuracy:{voting: 8.4f}'
               .format(loss=loss_val, acc=acc_val, voting=acc_val_voting))
@@ -128,7 +149,7 @@ def train(opt, model, trainloader, valloader, optimizer, scheduler):
                             loss_val=loss_val, acc_val=acc_val, acc_val_voting=acc_val_voting), )
 
         """ Early stopping """
-        if best_acc < acc_val:
+        if best_acc_voting < acc_val_voting:
             best_acc = acc_val
             best_loss = loss_val
             best_acc_voting = acc_val_voting
@@ -160,11 +181,11 @@ def train(opt, model, trainloader, valloader, optimizer, scheduler):
                    time.strftime("-%b_%d_%H_%M", time.localtime()) + '.pth')
 
 
-def test(opt, model, testloader):
+def test(opt, model, testloader, optimizer):
     print('\n[ Epoch testing ]')
 
     with torch.no_grad():
-        loss_test, acc_test, acc_test_voting = test_epoch(model, testloader, opt, dataset='test')
+        loss_test, acc_test, acc_test_voting = test_epoch(model, testloader, opt, optimizer, dataset='test')
 
     print('\n- [Info] Test loss:{loss: 8.4f}, accuracy:{acc: 8.4f}, voting accuracy:{voting: 8.4f}'
           .format(acc=acc_test, loss=loss_test, voting=acc_test_voting), )

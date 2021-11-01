@@ -146,6 +146,8 @@ class myResnet(nn.Module):
     def __init__(self, pretrained=True):
         super(myResnet, self).__init__()
         self.model = models.resnet18(pretrained=True)
+        # for param in self.model.parameters():
+        #     param.requires_grad = False
         arch = list(self.model.children())
         self.features = nn.Sequential(*arch[:3])
         #conv5 layer
@@ -166,6 +168,7 @@ class myResnet(nn.Module):
         x = self.spp(gx)
         x = torch.flatten(x, 1)
         #Pass through two fully connected layers
+        x = self.dropout(x)
         x = self.fc1(x)
         x = F.relu(x)
         x = self.dropout(x)
@@ -176,6 +179,7 @@ class myResnet(nn.Module):
 class xxMusic(nn.Module):
     def __init__(self, opt):
         super(xxMusic, self).__init__()
+
         self.resnet_pretrained = opt.resnet_pretrained
 
         self.layerNorm = nn.LayerNorm([1, 48000])
@@ -197,6 +201,8 @@ class xxMusic(nn.Module):
         self.resnet = myResnet(pretrained=self.resnet_pretrained)
         self.calc_loss = LabelSmoothingLoss(0.3, 10)
         # self.calc_loss = nn.CrossEntropyLoss()
+
+        # self.calc_loss =  nn.CrossEntropyLoss()
 
     def forward(self, x):
         """ Feature extraction """
@@ -226,6 +232,7 @@ class xxMusic(nn.Module):
         loss = self.calc_loss(score_pred, y_gt)
         _, y_pred = torch.max(score_pred, -1)
         num_correct_pred = y_pred.eq(y_gt).sum()
+
         return loss, num_correct_pred, y_pred
 
     def initialize_weights(self):

@@ -26,7 +26,6 @@ class LabelSmoothingLoss(nn.Module):
         pred_i (FloatTensor): (batch_size) x n_classes
         gt_i (LongTensor): batch_size
         """
-
         one_hot = F.one_hot(y_gt, num_classes=self.num_label).float()
         one_hot_non_tgt = (1 - one_hot)
         one_hot_smooth = one_hot * (1 - self.eps) + one_hot_non_tgt * self.eps / self.num_label
@@ -36,7 +35,7 @@ class LabelSmoothingLoss(nn.Module):
         return loss.sum()
 
 
-def calc_voting_accuracy(y_pred: torch.Tensor, dataset: str):
+def calc_voting_accuracy(y_pred: torch.Tensor, dataset: str, total_num_splits: int, y_test_fold):
     """
     Vote out the final predicted label by 10 split 3s clips.
     """
@@ -44,16 +43,21 @@ def calc_voting_accuracy(y_pred: torch.Tensor, dataset: str):
         _, _, y_gt = get_GTZAN_labels()
     elif dataset == 'val':
         _, y_gt, _ = get_GTZAN_labels()
+        y_gt = y_test_fold
+        y_gt = torch.FloatTensor(y_gt)
     else:
         y_gt, _, _ = get_GTZAN_labels()
+    # print(" a val ", torch.numel(y_gt))
+    # print(" a val ", torch.numel(y_pred))
 
-    num_30s = y_pred.shape[0] // 10
-    y_voting = torch.ones(num_30s).to(y_pred.device).int() * (-1)
+    y_voting = torch.ones(y_gt.shape[0]).to(y_pred.device).int() * (-1)
     y_pred = y_pred.int()
     y_gt = y_gt.to(y_pred.device)
 
-    for i in range(num_30s):
-        y_tmp = y_pred[i*10: (i+1)*10]
+    for i in range(y_gt.shape[0]):
+        y_tmp = y_pred[i*total_num_splits: (i+1)*total_num_splits]
+        print(" y tmp ", len(y_tmp))
+
         y_voting[i] = torch.bincount(y_tmp).argmax()
 
-    return y_gt.eq(y_voting).sum() / num_30s
+    return y_gt.eq(y_voting).sum() / y_gt.shape[0]

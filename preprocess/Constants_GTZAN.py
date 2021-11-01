@@ -1227,3 +1227,4 @@ filtered_test = [
     "rock.00090",
 ]
 
+filtered_train_val = filtered_train + filtered_valid
