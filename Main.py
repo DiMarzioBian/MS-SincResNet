@@ -61,15 +61,20 @@ def main():
     data = np.array(data)
     labels, train_labels, val_labels = get_GTZAN_labels_list()
     labels = np.array(labels)
+
+    #10 fold cros validation
     splitter = StratifiedKFold(n_splits=10,  shuffle=True)
     fold = 1
+
     for train_index, test_index in splitter.split(data, labels):
         print(f'FOLD {fold}')
         print('--------------------------------')
         x_train_fold = data[train_index]
         x_test_fold = data[test_index]
+        #Get the training and validation dataloader for current fold
         train_d = get_fold_dataloader('training', x_train_fold, opt)
         test_d = get_fold_dataloader('validation', x_test_fold, opt)
+
         trainloader = torch.utils.data.DataLoader(train_d, batch_size=opt.batch_size, shuffle=True, num_workers = opt.num_workers)
         valloader = torch.utils.data.DataLoader(test_d, batch_size=opt.batch_size, shuffle=False, num_workers = opt.num_workers)
 
