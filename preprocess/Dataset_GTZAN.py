@@ -143,6 +143,9 @@ class GTZAN_3s(Dataset):
             self.table_random[i] = random.sample(range(self.total_num_splits), self.splits_per_track)
 
 def get_dataset():
+    """
+    Returns list of training and validation set
+    """
     data = filtered_train_val
     return data
 
@@ -179,10 +182,16 @@ def get_GTZAN_labels():
 
 
 def get_GTZAN_labels_list():
+    """
+    Returns list of labels for training, validation and test set
+    """
     return [mapper_genre[s[:-6]] for s in filtered_train_val], [mapper_genre[s[:-6]] for s in filtered_train], [mapper_genre[s[:-6]] for s in filtered_valid]
 
 
 def get_fold_dataloader(data_type, fold, opt:argparse.Namespace):
+    """
+        Returns 3 second dataloader for GTZAN for a given fold
+    """
     opt.total_num_splits = int(30.5 // (3 + opt.hop_gap))
     if opt.splits_per_track > opt.total_num_splits:
         opt.splits_per_track = opt.total_num_splits
