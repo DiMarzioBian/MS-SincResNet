@@ -6,9 +6,7 @@ from scipy import signal
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torchaudio
-from torchaudio.datasets.utils import (download_url,
-                                       extract_archive,
-                                       )
+from torchaudio.datasets.utils import download_url, extract_archive
 import argparse
 from preprocess.Constants_GTZAN import *
 
@@ -50,7 +48,7 @@ class GTZAN_3s(Dataset):
     """ Event stream dataset. """
 
     def __init__(self,
-                 subset: str,
+                 list_filename: list,
                  new_sr: int,
                  sigma_gnoise: int = 0,
                  hop_gap: float = 0.5,
@@ -61,9 +59,8 @@ class GTZAN_3s(Dataset):
         """
         Instancelize GTZAN, indexing clips by enlarged indices and map label to integers.
         """
-        # self.walker = GTZAN(root='_data/GTZAN/', download=True, folder_in_archive='genres', subset=subset)
+        self._walker = list_filename
 
-        self.subset = subset
         self.root = root
         self.old_sr = 22050
         self.new_sr = new_sr  # 16000
@@ -92,14 +89,6 @@ class GTZAN_3s(Dataset):
             raise RuntimeError(
                 "Dataset not found. Please use `download=True` to download it."
             )
-
-        else:
-            if self.subset == "training":
-                self._walker = filtered_train
-            elif self.subset == "validation":
-                self._walker = filtered_valid
-            elif self.subset == "testing":
-                self._walker = filtered_test
 
         self.length = len(self._walker) * self.splits_per_track
 
@@ -135,34 +124,35 @@ class GTZAN_3s(Dataset):
             self.table_random[i] = random.sample(range(self.total_num_splits), self.splits_per_track)
 
 
-def get_GTZAN_dataloader(opt: argparse.Namespace):
+def get_GTZAN_dataloader(opt: argparse.Namespace, train_list: list, val_list: list):
     """ Load data and prepare dataloader. """
 
+    # Calculate how many 3s clips could be extracted from a 30s track as available maximum of 3s clips
+    # opt.splits_per_track is the needed number of samples which must not be greater than maximum of 3s clips
     opt.total_num_splits = int(30.5 // (3 + opt.hop_gap))
     if opt.splits_per_track > opt.total_num_splits:
         opt.splits_per_track = opt.total_num_splits
 
-    train_data = GTZAN_3s(subset='training', new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise, hop_gap=opt.hop_gap,
-                          splits_per_track=opt.splits_per_track)
+    # Instancelize dataset
+    train_data = GTZAN_3s(list_filename=train_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
+                          hop_gap=opt.hop_gap, splits_per_track=opt.splits_per_track)
 
-    val_data = GTZAN_3s(subset='validation', new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise, hop_gap=opt.hop_gap,
-                        splits_per_track=opt.total_num_splits)
+    val_data = GTZAN_3s(list_filename=val_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
+                        hop_gap=opt.hop_gap, splits_per_track=opt.splits_per_track)
 
-    test_data = GTZAN_3s(subset='testing', new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise, hop_gap=opt.hop_gap,
-                         splits_per_track=opt.total_num_splits)
+    # Instancelize dataloader
+    train_loader = DataLoader(train_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=True)
+    val_loader = DataLoader(val_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=False)
 
-    trainloader = DataLoader(train_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=True)
+    return train_loader, val_loader
+#
+#
+# def get_GTZAN_filename():
+#     """ Return filtered_all filename """
+#     return filtered_all
 
-    valloader = DataLoader(val_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=False)
 
-    testloader = DataLoader(test_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=False)
+def get_GTZAN_labels(list_filename: list):
+    """ Return filtered_all file genre """
+    return torch.IntTensor([mapper_genre[s[:-6]] for s in list_filename])
 
-    return trainloader, valloader, testloader
-
-
-def get_GTZAN_labels():
-    gt_train = torch.IntTensor([mapper_genre[s[:-6]] for s in filtered_train])
-    gt_val = torch.IntTensor([mapper_genre[s[:-6]] for s in filtered_valid])
-    gt_test = torch.IntTensor([mapper_genre[s[:-6]] for s in filtered_test])
-
-    return gt_train, gt_val, gt_test

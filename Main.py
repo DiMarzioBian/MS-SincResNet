@@ -8,21 +8,21 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from preprocess.Dataset import get_dataloader
+from preprocess.Dataset import getter_dataloader
 from Epoch import train_epoch, test_epoch
 from Utils import adjust_learning_rate
 
 
-def main():
+def main(fold: int):
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-version', type=str, default='0.4')
+    parser.add_argument('-version', type=str, default='1.0')
     parser.add_argument('-load_state', default=False)  # Provide state_dict path for testing or continue training
     parser.add_argument('-save_state', default=False)  # Saving best or latest model state_dict
     parser.add_argument('-test_only', default=False)  # Enable to skip training session
     parser.add_argument('-test_original', default=False)  # Deprecated, model structure has changed
 
-    parser.add_argument('-data', default='GTZAN')
+    parser.add_argument('-data', default='GTZAN') # ranging from 0 to 9, integer
     parser.add_argument('-sample_rate', type=int, default=16000)
     parser.add_argument('-hop_gap', type=float, default=0.5)  # time gap between each adjacent splits in a track
     parser.add_argument('-splits_per_track', type=int, default=4)  # Random sample some splits instead of using all
@@ -41,8 +41,9 @@ def main():
     # parser.add_argument('-resnet_freeze', default=False)
 
     opt = parser.parse_args()
+    opt.fold = fold
     opt.device = torch.device('cuda')
-    opt.log = '_result/log/' + opt.version + time.strftime("-%b_%d_%H_%M", time.localtime()) + '.txt'
+    opt.log = '_result/log/v'+opt.version+'-fold'+str(opt.fold)+time.strftime("-%b_%d_%H_%M", time.localtime())+'.txt'
 
     with open(opt.log, 'w') as f:
         f.write('Epoch, Time, loss_tr, acc_tr, loss_val, acc_val, acc_val_voting\n')
@@ -56,7 +57,8 @@ def main():
 
     # Import data
     print('\n[Info] Loading data...')
-    trainloader, valloader, testloader = get_dataloader('GTZAN', opt)
+    data_getter = getter_dataloader(opt)
+    trainloader, valloader, val_gt_voting = data_getter.get(opt.fold)
     opt.num_label = trainloader.dataset.num_label
 
     # Load Music model
@@ -68,7 +70,6 @@ def main():
         model.initialize_weights()
 
     model.to(opt.device)
-    model.eval()
 
     optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()), lr=opt.lr, momentum=0.9)
     scheduler = optim.lr_scheduler.StepLR(optimizer, int(opt.lr_patience), gamma=0.707)
@@ -82,13 +83,18 @@ def main():
 
     # Run model
     if not opt.test_only:
-        train(opt, model, trainloader, valloader, optimizer, scheduler)
-    test(opt, model, testloader)
+        # Train model
+        train(opt, model, trainloader, valloader, val_gt_voting, optimizer, scheduler)
+    else:
+        # Test only
+        if opt.load_state:
+            model.load_state_dict(opt.load_state)
+        test(opt, model, valloader, val_gt_voting)
 
     print('\n------------------------ Finished. ------------------------\n')
 
 
-def train(opt, model, trainloader, valloader, optimizer, scheduler):
+def train(opt, model, trainloader, valloader, val_gt_voting, optimizer, scheduler):
 
     # Define logging variants
     best_loss = 1e9
@@ -118,7 +124,7 @@ def train(opt, model, trainloader, valloader, optimizer, scheduler):
 
         """ Validating """
         with torch.no_grad():
-            loss_val, acc_val, acc_val_voting = test_epoch(model, valloader, opt, dataset='val')
+            loss_val, acc_val, acc_val_voting = test_epoch(model, valloader, val_gt_voting, opt, dataset='val')
 
         print('\n- (Validating) Loss:{loss: 8.5f}, accuracy:{acc: 8.4f} and voting accuracy:{voting: 8.4f}'
               .format(loss=loss_val, acc=acc_val, voting=acc_val_voting))
@@ -163,11 +169,11 @@ def train(opt, model, trainloader, valloader, optimizer, scheduler):
                    time.strftime("-%b_%d_%H_%M", time.localtime()) + '.pth')
 
 
-def test(opt, model, testloader):
+def test(opt, model, valloader, val_gt_voting):
     print('\n[ Epoch testing ]')
 
     with torch.no_grad():
-        loss_test, acc_test, acc_test_voting = test_epoch(model, testloader, opt, dataset='test')
+        loss_test, acc_test, acc_test_voting = test_epoch(model, valloader, val_gt_voting, opt, dataset='test')
 
     print('\n- [Info] Test loss:{loss: 8.4f}, accuracy:{acc: 8.4f}, voting accuracy:{voting: 8.4f}'
           .format(acc=acc_test, loss=loss_test, voting=acc_test_voting), )
@@ -181,7 +187,8 @@ if __name__ == '__main__':
     os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     seed = 0
     np.random.seed(seed)
-    # torch.manual_seed(seed)
-    # torch.cuda.manual_seed_all(seed)
-    # torch.backends.cudnn.deterministic = True
-    main()
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    for fold in range(10):
+        main(fold)

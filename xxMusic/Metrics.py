@@ -35,23 +35,17 @@ class LabelSmoothingLoss(nn.Module):
         return loss.sum()
 
 
-def calc_voting_accuracy(y_pred: torch.Tensor, dataset: str, total_num_splits: int):
+def calc_voting_accuracy(y_pred: torch.Tensor, y_gt: torch.Tensor, splits_per_track: int):
     """
     Vote out the final predicted label by 10 split 3s clips.
     """
-    if dataset == 'test':
-        _, _, y_gt = get_GTZAN_labels()
-    elif dataset == 'val':
-        _, y_gt, _ = get_GTZAN_labels()
-    else:
-        y_gt, _, _ = get_GTZAN_labels()
 
     y_voting = torch.ones(y_gt.shape[0]).to(y_pred.device).int() * (-1)
     y_pred = y_pred.int()
     y_gt = y_gt.to(y_pred.device)
 
     for i in range(y_gt.shape[0]):
-        y_tmp = y_pred[i*total_num_splits: (i+1)*total_num_splits]
+        y_tmp = y_pred[i*splits_per_track: (i+1)*splits_per_track]
         y_voting[i] = torch.bincount(y_tmp).argmax()
 
     return y_gt.eq(y_voting).sum() / y_gt.shape[0]
