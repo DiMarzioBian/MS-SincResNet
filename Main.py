@@ -149,15 +149,19 @@ def train(opt, model, trainloader, valloader, val_gt_voting, optimizer, schedule
             print("\n- Early stopping patience counter {} of {}".format(patience, opt.es_patience))
 
             if patience == opt.es_patience:
-                print("\n- [Info]Early stopping with best loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
+
+                print("\n[Info]Early stopping with best loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
                       "and best voting accuracy: {voting: 8.4f}"
                       .format(acc=best_acc, loss=best_loss, voting=best_acc_voting), )
+
+                with open(opt.log, 'a') as f:
+                    f.write("\n[Info]Early stopping with best loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
+                            "and best voting accuracy: {voting: 8.4f}"
+                            .format(acc=best_acc, loss=best_loss, voting=best_acc_voting), )
                 break
 
     """ Reloading best model """
-    print('\n- [Info] Final accuracy: {acc: 8.4f}, final accuracy: {loss: 8.5f}'
-          .format(acc=best_acc, loss=best_loss), )
-
+    model.load_state_dict(model_best)
     with open(opt.log, 'a') as f:
         # Save hyperparameters
         for k, v in vars(opt).items():
