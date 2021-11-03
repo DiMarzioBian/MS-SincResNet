@@ -91,8 +91,6 @@ def main(fold: int):
             model.load_state_dict(opt.load_state)
         test(opt, model, valloader, val_gt_voting)
 
-    print('\n------------------------ Finished. ------------------------\n')
-
 
 def train(opt, model, trainloader, valloader, val_gt_voting, optimizer, scheduler):
 
@@ -196,3 +194,5 @@ if __name__ == '__main__':
 
     for fold in range(10):
         main(fold)
+
+    print('\n------------------------ Finished. ------------------------\n')
