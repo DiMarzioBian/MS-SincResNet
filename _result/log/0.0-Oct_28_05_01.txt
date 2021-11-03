@@ -1,1 +1,0 @@
-Epoch, Time, loss_tr, acc_tr, loss_val, acc_val, acc_val_voting
