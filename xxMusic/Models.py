@@ -221,10 +221,3 @@ class xxMusic(nn.Module):
         num_correct_pred = y_pred.eq(y_gt).sum()
         return loss, num_correct_pred, y_pred
 
-    def initialize_weights(self):
-        """ Initialize weights """
-        # torch.nn.init.normal_(self.resnet.model.fc.weight.data, 0, 0.01)
-        # self.resnet.model.fc.bias.data.zero_()
-
-        num_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
-        print('\n[Info] Number of parameters: {}'.format(num_params))

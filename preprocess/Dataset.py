@@ -36,3 +36,13 @@ class getter_dataloader(object):
                                                                        [self.data_filename[i] for i in val_index])
                 val_gt_voting = get_GTZAN_labels([self.data_filename[i] for i in val_index])
                 return train_loader, val_loader, val_gt_voting
+
+
+def get_num_label(dataset: str):
+    if dataset == 'GTZAN':
+        return 10
+    elif dataset == 'BALLROOM':
+        return 10
+    elif  dataset == 'ISMIR2004':
+        return 7
+    else: raise RuntimeError('Dataset ' + dataset + ' not found!')

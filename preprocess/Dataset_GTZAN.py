@@ -52,7 +52,7 @@ class GTZAN_3s(Dataset):
                  new_sr: int,
                  sigma_gnoise: int = 0,
                  hop_gap: float = 0.5,
-                 splits_per_track: int = 100,
+                 sample_splits_per_track: int = 100,
                  root: str = '_data/GTZAN/',
                  download: bool = False,
                  url: str = URL):
@@ -66,7 +66,7 @@ class GTZAN_3s(Dataset):
         self.new_sr = new_sr  # 16000
         self.sigma_gnoise = sigma_gnoise
         self.hop_gap = hop_gap
-        self.splits_per_track = splits_per_track
+        self.sample_splits_per_track = sample_splits_per_track
         self.download = download
         self.url = url
 
@@ -90,11 +90,11 @@ class GTZAN_3s(Dataset):
                 "Dataset not found. Please use `download=True` to download it."
             )
 
-        self.length = len(self._walker) * self.splits_per_track
+        self.length = len(self._walker) * self.sample_splits_per_track
 
         self.table_random = [[]] * len(self._walker)
         for i in range(len(self._walker)):
-            self.table_random[i] = random.sample(range(self.total_num_splits), self.splits_per_track)
+            self.table_random[i] = random.sample(range(self.total_num_splits), self.sample_splits_per_track)
 
     def __len__(self):
         return self.length
@@ -103,7 +103,7 @@ class GTZAN_3s(Dataset):
         """
         Each returned element is a tuple[data(torch.tensor), label(int)]
         """
-        index_full, index_table_split = divmod(index, self.splits_per_track)
+        index_full, index_table_split = divmod(index, self.sample_splits_per_track)
         index_split = self.table_random[index_full][index_table_split]
 
         wave, sr, genre_str = load_gtzan_item(self._walker[index_full], self._path, self._ext_audio)
@@ -121,24 +121,24 @@ class GTZAN_3s(Dataset):
 
     def shuffle(self):
         for i in range(len(self._walker)):
-            self.table_random[i] = random.sample(range(self.total_num_splits), self.splits_per_track)
+            self.table_random[i] = random.sample(range(self.total_num_splits), self.sample_splits_per_track)
 
 
 def get_GTZAN_dataloader(opt: argparse.Namespace, train_list: list, val_list: list):
     """ Load data and prepare dataloader. """
 
     # Calculate how many 3s clips could be extracted from a 30s track as available maximum of 3s clips
-    # opt.splits_per_track is the needed number of samples which must not be greater than maximum of 3s clips
+    # opt.sample_splits_per_track is the needed number of samples which must not be greater than maximum of 3s clips
     opt.total_num_splits = int(30.5 // (3 + opt.hop_gap))
-    if opt.splits_per_track > opt.total_num_splits:
-        opt.splits_per_track = opt.total_num_splits
+    if opt.sample_splits_per_track > opt.total_num_splits:
+        opt.sample_splits_per_track = opt.total_num_splits
 
     # Instancelize dataset
     train_data = GTZAN_3s(list_filename=train_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
-                          hop_gap=opt.hop_gap, splits_per_track=opt.splits_per_track)
+                          hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track)
 
     val_data = GTZAN_3s(list_filename=val_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
-                        hop_gap=opt.hop_gap, splits_per_track=opt.splits_per_track)
+                        hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track)
 
     # Instancelize dataloader
     train_loader = DataLoader(train_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=True)
