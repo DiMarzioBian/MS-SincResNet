@@ -123,24 +123,7 @@ class SincConv_fast(nn.Module):
                         groups=1)
 
 
-class myResnet(nn.Module):
-    def __init__(self, pretrained=True):
-        super(myResnet, self).__init__()
-
-        arch = list(models.resnet18(pretrained=True).children())
-        self.model_1to4 = nn.Sequential(*arch[:-3])
-        self.conv5_1 = arch[-3:-2][0][0]
-        self.conv5_2 = nn.Sequential(*list(arch[-3:-2][0][1].children())[:-1])
-
-    def forward(self, x):
-        x = self.model_1to4(x)
-        x = self.conv5_1(x)
-        x = self.conv5_2(x)
-        return x
-
-
 class SpatialPyramidPool2D(nn.Module):
-
     def __init__(self):
         super(SpatialPyramidPool2D, self).__init__()
         self.local_avg_pool = nn.AdaptiveAvgPool2d(output_size=(2, 2))
@@ -157,10 +140,33 @@ class SpatialPyramidPool2D(nn.Module):
         return torch.cat((out1, out2), 1)
 
 
+class SPP_Resnet(nn.Module):
+    def __init__(self, pretrained=True, enable_spp=True):
+        super(SPP_Resnet, self).__init__()
+
+        if enable_spp:
+            arch = list(models.resnet18(pretrained=pretrained).children())
+            self.model = nn.Sequential(
+                nn.Sequential(*arch[:-3]),
+                arch[-3:-2][0][0],
+                nn.Sequential(*list(arch[-3:-2][0][1].children())[:-1]),
+                SpatialPyramidPool2D(),
+                nn.Linear(2560, 10, bias=True)
+            )
+        else:
+            self.model = models.resnet18(pretrained=pretrained)
+            self.model.fc = nn.Linear(512, 10, bias=True)
+
+    def forward(self, x):
+        x = self.model(x)
+        return x
+
+
 class xxMusic(nn.Module):
     def __init__(self, opt):
         super(xxMusic, self).__init__()
         self.resnet_pretrained = opt.resnet_pretrained
+        self.enable_spp = opt.enable_spp
 
         self.layerNorm = nn.LayerNorm([1, 3*opt.sample_rate])
         self.sincNet1 = nn.Sequential(
@@ -178,14 +184,7 @@ class xxMusic(nn.Module):
             nn.BatchNorm1d(160),
             nn.ReLU(inplace=True),
             nn.AdaptiveAvgPool1d(1024))
-        self.resnet = myResnet(pretrained=self.resnet_pretrained)
-        self.spp = SpatialPyramidPool2D()
-        self.mlp = nn.Sequential(
-            nn.Linear(2560, 256, bias=True),
-            nn.BatchNorm1d(256, eps=1e-05, momentum=0.1),
-            nn.ReLU(inplace=True),
-            nn.Linear(256, 10, bias=True),
-        )
+        self.spp_resnet = SPP_Resnet(pretrained=self.resnet_pretrained, enable_spp=self.enable_spp)
 
         self.calc_loss = LabelSmoothingLoss(opt.smooth_label, opt.num_label)
 
@@ -200,9 +199,7 @@ class xxMusic(nn.Module):
         x = torch.cat((feat1.unsqueeze_(dim=1),
                        feat2.unsqueeze_(dim=1),
                        feat3.unsqueeze_(dim=1)), dim=1)
-        x = self.resnet(x)
-        x = self.spp(x)
-        x = self.mlp(x)
+        x = self.spp_resnet(x)
         return x, feat1, feat2, feat3
 
     def loss(self, wave, y_gt):

@@ -16,11 +16,14 @@ from Utils import adjust_learning_rate
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-version', type=str, default='1.0')
+    parser.add_argument('-version', type=str, default='1.3')
+    parser.add_argument('-note', type=str, default='Adjust prediction layer.')
     parser.add_argument('-load_state', default=False)  # Provide state_dict path for testing or continue training
     parser.add_argument('-save_state', default=False)  # Saving best or latest model state_dict
     parser.add_argument('-test_only', default=False)  # Enable to skip training session
     parser.add_argument('-test_original', default=False)  # Deprecated, model structure has changed
+
+    parser.add_argument('-enable_spp', default=True)  # Enable SPP layer instead of ResNet fc layer directly
 
     parser.add_argument('-data', default='GTZAN')  # ranging from 0 to 9, integer
     parser.add_argument('-sample_rate', type=int, default=16000)
@@ -29,20 +32,22 @@ def main():
     parser.add_argument('-sigma_gnoise', type=float, default=0.004)
     parser.add_argument('-smooth_label', type=float, default=0.3)
 
-    parser.add_argument('-epoch', type=int, default=100)
-    parser.add_argument('-num_workers', type=int, default=2)
-    parser.add_argument('-batch_size', type=int, default=2)
+    parser.add_argument('-epoch', type=int, default=200)
+    parser.add_argument('-num_workers', type=int, default=8)
+    parser.add_argument('-batch_size', type=int, default=75)
     parser.add_argument('-manual_lr', default=False)
-    parser.add_argument('-lr', type=float, default=1e-4)  # Enable manual_lr will override this lr
+    parser.add_argument('-lr', type=float, default=1e-3)  # Enable manual_lr will override this lr
     parser.add_argument('-lr_patience', type=int, default=10)
+    parser.add_argument('-l2_reg', type=float, default=1e-5)
     parser.add_argument('-es_patience', type=int, default=15)
+    parser.add_argument('-gamma_steplr', type=float, default=np.sqrt(0.1))
 
     parser.add_argument('-resnet_pretrained', default=True)
     # parser.add_argument('-resnet_freeze', default=False)
 
     opt = parser.parse_args()
     opt.device = torch.device('cuda')
-    opt.log = '_result/log/v'+opt.version+time.strftime("-%b_%d_%H_%M", time.localtime())+'.txt'
+    opt.log = '_result/log/v' + opt.version + time.strftime("-%b_%d_%H_%M", time.localtime()) + '.txt'
 
     # Test the original pretrained MS-SincResNet
     if opt.test_original:
@@ -86,8 +91,10 @@ def train(opt):
 
         model.to(opt.device)
 
-        optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()), lr=opt.lr, momentum=0.9)
-        scheduler = optim.lr_scheduler.StepLR(optimizer, int(opt.lr_patience), gamma=0.707)
+        optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()), lr=opt.lr, momentum=0.9,
+                              weight_decay=opt.l2_reg, nesterov=True)
+        # optimizer = optim.Adam(filter(lambda x: x.requires_grad, model.parameters()), lr=opt.lr, weight_decay=opt.l2_reg)
+        scheduler = optim.lr_scheduler.StepLR(optimizer, int(opt.lr_patience), gamma=opt.gamma_steplr)
 
         # Load data
         print('\n[Info] Loading data...')
@@ -134,7 +141,7 @@ def train(opt):
                                 loss_val=loss_val, acc_val=acc_val, acc_val_voting=acc_val_voting), )
 
             """ Early stopping """
-            if best_acc_voting < acc_val_voting:
+            if best_acc_voting <= acc_val_voting:
                 best_acc = acc_val
                 best_loss = loss_val
                 best_acc_voting = acc_val_voting
@@ -147,9 +154,8 @@ def train(opt):
                 print("\n- Early stopping patience counter {} of {}".format(patience, opt.es_patience))
 
                 if patience == opt.es_patience:
-
                     print("\n[Info] Early stopping with best loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
-                          "and best voting accuracy: {voting: 8.4f}"
+                          "and best voting accuracy: {voting: 8.4f}\n"
                           .format(acc=best_acc, loss=best_loss, voting=best_acc_voting), )
 
                     with open(opt.log, 'a') as f:
@@ -168,6 +174,7 @@ def train(opt):
             torch.save(model_best, '_result/model/xxMusic-v' + opt.version + '-' +
                        time.strftime("-%b_%d_%H_%M", time.localtime()) + '.pth')
         print("\n------------------------ Finished fold:{fold} ------------------------\n".format(fold=fold))
+
 
 # def test(opt, model, data_getter):
 #     print('\n[ Epoch testing ]')

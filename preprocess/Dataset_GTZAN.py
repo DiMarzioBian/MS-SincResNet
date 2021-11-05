@@ -53,6 +53,7 @@ class GTZAN_3s(Dataset):
                  sigma_gnoise: int = 0,
                  hop_gap: float = 0.5,
                  sample_splits_per_track: int = 100,
+                 augment: bool = False,
                  root: str = '_data/GTZAN/',
                  download: bool = False,
                  url: str = URL):
@@ -67,6 +68,7 @@ class GTZAN_3s(Dataset):
         self.sigma_gnoise = sigma_gnoise
         self.hop_gap = hop_gap
         self.sample_splits_per_track = sample_splits_per_track
+        self.augment = augment
         self.download = download
         self.url = url
 
@@ -114,9 +116,9 @@ class GTZAN_3s(Dataset):
         wave = torch.from_numpy(wave[start: end]).float().unsqueeze_(dim=0)
 
         # augmentation
-        wave = torchaudio.transforms.Vol(gain=0.9, gain_type="amplitude")(wave)
-        wave += torch.randn(wave.shape[-1]).unsqueeze(0) * self.sigma_gnoise
-
+        if self.augment:
+            wave *= torch.rand(1) * 0.2 + 0.9
+            wave += torch.randn(wave.size()) * self.sigma_gnoise
         return wave, mapper_genre[genre_str]
 
     def shuffle(self):
@@ -135,10 +137,10 @@ def get_GTZAN_dataloader(opt: argparse.Namespace, train_list: list, val_list: li
 
     # Instancelize dataset
     train_data = GTZAN_3s(list_filename=train_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
-                          hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track)
+                          hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=True)
 
     val_data = GTZAN_3s(list_filename=val_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
-                        hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track)
+                        hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=False)
 
     # Instancelize dataloader
     train_loader = DataLoader(train_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=True)
