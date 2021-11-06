@@ -7,6 +7,7 @@ import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torchaudio.datasets.utils import download_url, extract_archive
 
 from preprocess.Dataset import getter_dataloader, get_num_label
 from Epoch import train_epoch, test_epoch
@@ -26,6 +27,8 @@ def main():
     parser.add_argument('-enable_spp', default=True)  # Enable SPP layer instead of ResNet fc layer directly
 
     parser.add_argument('-data', default='GTZAN')  # ranging from 0 to 9, integer
+    parser.add_argument('-enable_data_filtered', default=False)  # Enable data filtering
+    parser.add_argument('-download', default=True)  # Download dataset
     parser.add_argument('-sample_rate', type=int, default=16000)
     parser.add_argument('-hop_gap', type=float, default=0.5)  # time gap between each adjacent splits in a track
     parser.add_argument('-sample_splits_per_track', type=int, default=4)  # Random sampling splits instead of using all
@@ -34,7 +37,7 @@ def main():
 
     parser.add_argument('-epoch', type=int, default=200)
     parser.add_argument('-num_workers', type=int, default=8)
-    parser.add_argument('-batch_size', type=int, default=75)
+    parser.add_argument('-batch_size', type=int, default=60)
     parser.add_argument('-manual_lr', default=False)
     parser.add_argument('-lr', type=float, default=1e-3)  # Enable manual_lr will override this lr
     parser.add_argument('-lr_patience', type=int, default=10)
@@ -59,6 +62,22 @@ def main():
     print('\n[Info] Model settings:\n')
     for k, v in vars(opt).items():
         print('         %s: %s' % (k, v))
+
+    # Download dataset
+    if opt.download:
+        if opt.data == 'GTZAN':
+
+            root = '_data/GTZAN/'
+            url = "http://opihi.cs.uvic.ca/sound/genres.tar.gz"
+            _checksums = {"http://opihi.cs.uvic.ca/sound/genres.tar.gz": "5b3d6dddb579ab49814ab86dba69e7c7"}
+
+            archive = os.path.basename(url)
+            archive = os.path.join(root, archive)
+            if not os.path.isdir(os.path.join(root, 'genres')):
+                if not os.path.isfile(archive):
+                    checksum = _checksums.get(url, None)
+                    download_url(url, root, hash_value=checksum, hash_type="md5")
+                extract_archive(archive)
 
     # Run model
     train(opt)

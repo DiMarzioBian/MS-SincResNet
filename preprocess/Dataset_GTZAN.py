@@ -6,13 +6,7 @@ from scipy import signal
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torchaudio
-from torchaudio.datasets.utils import download_url, extract_archive
 import argparse
-from preprocess.Constants_GTZAN import *
-
-
-URL = "http://opihi.cs.uvic.ca/sound/genres.tar.gz"
-_CHECKSUMS = {"http://opihi.cs.uvic.ca/sound/genres.tar.gz": "5b3d6dddb579ab49814ab86dba69e7c7"}
 
 mapper_genre = {
     "blues": 0,
@@ -54,9 +48,7 @@ class GTZAN_3s(Dataset):
                  hop_gap: float = 0.5,
                  sample_splits_per_track: int = 100,
                  augment: bool = False,
-                 root: str = '_data/GTZAN/',
-                 download: bool = False,
-                 url: str = URL):
+                 root: str = '_data/GTZAN/',):
         """
         Instancelize GTZAN, indexing clips by enlarged indices and map label to integers.
         """
@@ -69,23 +61,12 @@ class GTZAN_3s(Dataset):
         self.hop_gap = hop_gap
         self.sample_splits_per_track = sample_splits_per_track
         self.augment = augment
-        self.download = download
-        self.url = url
 
         self.num_label = len(mapper_genre)
         self.total_num_splits = int(30.5 // (3+hop_gap))
         self._ext_audio = ".wav"
 
-        archive = os.path.basename(url)
-        archive = os.path.join(root, archive)
         self._path = os.path.join(root, 'genres')
-
-        if download:
-            if not os.path.isdir(self._path):
-                if not os.path.isfile(archive):
-                    checksum = _CHECKSUMS.get(self.url, None)
-                    download_url(self.url, self.root, hash_value=checksum, hash_type="md5")
-                extract_archive(archive)
 
         if not os.path.isdir(self._path):
             raise RuntimeError(

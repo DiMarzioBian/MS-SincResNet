@@ -2,16 +2,32 @@ from preprocess.Dataset_GTZAN import *
 from sklearn.model_selection import StratifiedKFold
 
 
+from preprocess.Constants_GTZAN import *
+
+
 class getter_dataloader(object):
     """ Choose dataset. """
 
     def __init__(self, opt):
         self.opt = opt
         dataset = self.opt.data
+        enable_data_filtered = self.opt.enable_data_filtered
 
         if dataset == 'GTZAN':
-            self.data_filename = filtered_all
-            self.data_labels = get_GTZAN_labels(filtered_all)
+            if enable_data_filtered:
+                # Load filtered file names
+                self.data_filename = filtered_all
+                self.data_labels = get_GTZAN_labels(filtered_all)
+            else:
+                # Create unfiltered file names
+                label = ['blues', 'classical', 'country', 'disco', 'hiphop', 'jazz', 'metal', 'pop', 'reggae', 'rock']
+                unfiltered_all = []
+                for lbl in label:
+                    for i in range(100):
+                        unfiltered_all.append(lbl + '.000' + str(i).zfill(2))
+                self.data_filename = unfiltered_all
+                self.data_labels = get_GTZAN_labels(unfiltered_all)
+
             self.get_dataset_dataloader = get_GTZAN_dataloader
         elif dataset == 'BALLROOM':
             raise RuntimeError('Dataset ' + dataset + ' not loaded so far!')
@@ -43,6 +59,6 @@ def get_num_label(dataset: str):
         return 10
     elif dataset == 'BALLROOM':
         return 10
-    elif  dataset == 'ISMIR2004':
+    elif dataset == 'ISMIR2004':
         return 7
     else: raise RuntimeError('Dataset ' + dataset + ' not found!')
