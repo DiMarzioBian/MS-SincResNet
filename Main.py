@@ -18,7 +18,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-version', type=str, default='1.3')
-    parser.add_argument('-note', type=str, default='Adjust prediction layer.')
+    parser.add_argument('-note', type=str, default='Add calculating average result of cross val.')
     parser.add_argument('-load_state', default=False)  # Provide state_dict path for testing or continue training
     parser.add_argument('-save_state', default=False)  # Saving best or latest model state_dict
     parser.add_argument('-test_only', default=False)  # Enable to skip training session
@@ -92,6 +92,10 @@ def train(opt):
     # Import data
     data_getter = getter_dataloader(opt)
     opt.num_label = get_num_label(opt.data)
+
+    cv_acc = np.zeros(10)
+    cv_loss = np.zeros(10)
+    cv_acc_voting = np.zeros(10)
 
     """ Iterate 10 folds """
     for fold in range(10):
@@ -173,27 +177,37 @@ def train(opt):
                 print("\n- Early stopping patience counter {} of {}".format(patience, opt.es_patience))
 
                 if patience == opt.es_patience:
-                    print("\n[Info] Early stopping with best loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
-                          "and best voting accuracy: {voting: 8.4f}\n"
-                          .format(acc=best_acc, loss=best_loss, voting=best_acc_voting), )
-
-                    with open(opt.log, 'a') as f:
-                        f.write("\n[Info] Early stopping with best loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
-                                "and best voting accuracy: {voting: 8.4f}"
-                                .format(acc=best_acc, loss=best_loss, voting=best_acc_voting), )
-
-                        f.write("\n------------------------ Finished fold:{fold} ------------------------\n"
-                                .format(fold=fold), )
-
+                    print("\n[Info] Stop training")
                     break
 
-        """ Saving best model """
+        """ Logging """
+        cv_loss[fold] = best_loss
+        cv_acc[fold] = best_acc
+        cv_acc_voting[fold] = best_acc_voting
+
+        print("\n[Info] Training stopped with best loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
+              "and best voting accuracy: {voting: 8.4f}\n"
+              .format(loss=best_loss, acc=best_acc, voting=best_acc_voting), )
+
+        with open(opt.log, 'a') as f:
+            f.write("\n[Info] Training stopped with best loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
+                    "and best voting accuracy: {voting: 8.4f}"
+                    .format(loss=best_loss, acc=best_acc, voting=best_acc_voting), )
+
+            f.write("\n------------------------ Finished fold:{fold} ------------------------\n"
+                    .format(fold=fold), )
+
         if opt.save_state:
             model.load_state_dict(model_best)
             torch.save(model_best, '_result/model/xxMusic-v' + opt.version + '-' +
                        time.strftime("-%b_%d_%H_%M", time.localtime()) + '.pth')
         print("\n------------------------ Finished fold:{fold} ------------------------\n".format(fold=fold))
 
+    """ Final logging """
+    with open(opt.log, 'a') as f:
+        f.write("\n[Info] Average cross validation loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
+                "and best voting accuracy: {voting: 8.4f}\n"
+                .format(loss=np.mean(cv_loss), acc=np.mean(cv_acc), voting=np.mean(_acc_voting)), )
 
 # def test(opt, model, data_getter):
 #     print('\n[ Epoch testing ]')
