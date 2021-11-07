@@ -17,8 +17,8 @@ from Utils import adjust_learning_rate
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-version', type=str, default='1.3')
-    parser.add_argument('-note', type=str, default='Add calculating average result of cross val.')
+    parser.add_argument('-version', type=str, default='1.3.1')
+    parser.add_argument('-note', type=str, default='Set manual lr follow paper.')
     parser.add_argument('-load_state', default=False)  # Provide state_dict path for testing or continue training
     parser.add_argument('-save_state', default=False)  # Saving best or latest model state_dict
     parser.add_argument('-test_only', default=False)  # Enable to skip training session

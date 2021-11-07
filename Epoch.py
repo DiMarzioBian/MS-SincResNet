@@ -28,7 +28,8 @@ def train_epoch(model, data, opt, optimizer):
         loss = loss_batch / batch.__len__()
 
         loss.backward()
-        optimizer.step()
+        if not opt.manual_lr:
+            optimizer.step()
 
         num_pred_correct_epoch += num_pred_correct_batch
         loss_epoch += loss_batch
