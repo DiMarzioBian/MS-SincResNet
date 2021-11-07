@@ -23,7 +23,7 @@ def main():
     parser.add_argument('-test_only', default=False)  # Enable to skip training session
     parser.add_argument('-test_original', default=False)  # Deprecated, model structure has changed
 
-    parser.add_argument('-enable_spp', default=True)  # Enable SPP layer instead of ResNet fc layer directly
+    parser.add_argument('-enable_spp', default=False)  # Enable SPP layer instead of ResNet fc layer directly
 
     parser.add_argument('-data', default='GTZAN')  # ranging from 0 to 9, integer
     parser.add_argument('-sample_rate', type=int, default=16000)
@@ -32,9 +32,9 @@ def main():
     parser.add_argument('-sigma_gnoise', type=float, default=0.004)
     parser.add_argument('-smooth_label', type=float, default=0.3)
 
-    parser.add_argument('-epoch', type=int, default=200)
-    parser.add_argument('-num_workers', type=int, default=8)
-    parser.add_argument('-batch_size', type=int, default=75)
+    parser.add_argument('-epoch', type=int, default=20)
+    parser.add_argument('-num_workers', type=int, default=100)
+    parser.add_argument('-batch_size', type=int, default=4)
     parser.add_argument('-manual_lr', default=False)
     parser.add_argument('-lr', type=float, default=1e-3)  # Enable manual_lr will override this lr
     parser.add_argument('-lr_patience', type=int, default=10)
@@ -43,6 +43,7 @@ def main():
     parser.add_argument('-gamma_steplr', type=float, default=np.sqrt(0.1))
 
     parser.add_argument('-resnet_pretrained', default=True)
+    parser.add_argument('-loss_type', default='LabelSmooth')
     # parser.add_argument('-resnet_freeze', default=False)
 
     opt = parser.parse_args()
