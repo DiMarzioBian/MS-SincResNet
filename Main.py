@@ -43,7 +43,7 @@ def main():
     parser.add_argument('-gamma_steplr', type=float, default=np.sqrt(0.1))
 
     parser.add_argument('-resnet_pretrained', default=True)
-    parser.add_argument('-loss_type', default='LabelSmooth')
+    parser.add_argument('-loss_type', default='LabelSmooth') # Other values can be CrossEntropy or CenterLoss
     # parser.add_argument('-resnet_freeze', default=False)
 
     opt = parser.parse_args()
