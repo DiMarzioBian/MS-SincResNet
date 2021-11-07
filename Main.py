@@ -207,7 +207,7 @@ def train(opt):
     with open(opt.log, 'a') as f:
         f.write("\n[Info] Average cross validation loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
                 "and best voting accuracy: {voting: 8.4f}\n"
-                .format(loss=np.mean(cv_loss), acc=np.mean(cv_acc), voting=np.mean(_acc_voting)), )
+                .format(loss=np.mean(cv_loss), acc=np.mean(cv_acc), voting=np.mean(cv_acc_voting)), )
 
 # def test(opt, model, data_getter):
 #     print('\n[ Epoch testing ]')
@@ -230,5 +230,4 @@ if __name__ == '__main__':
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     main()
-
     print('\n------------------------ Finished. ------------------------\n')
