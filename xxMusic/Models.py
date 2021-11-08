@@ -192,7 +192,7 @@ class xxMusic(nn.Module):
         elif self.loss_type=='CrossEntropy':
             self.calc_loss = nn.CrossEntropyLoss()
         elif self.loss_type=='CenterLoss':
-            self.calc_loss = nn.CrossEntropyLoss()
+            self.calc_loss = LabelSmoothingLoss(opt.smooth_label, opt.num_label)
             self.calc_loss2 = CenterLoss(num_classes=8, feat_dim=10, use_gpu=True)
 
     def forward(self, x):
@@ -224,8 +224,9 @@ class xxMusic(nn.Module):
         """ Predict data label and compute loss"""
         score_pred, *_ = self.forward(wave)
         loss1 = self.calc_loss(score_pred, y_gt)
-        loss2 = self.calc_loss2(score_pred, y_gt)
-        loss = loss1 + 1e-4 * loss2
+        if self.calc_loss2:
+            loss2 = self.calc_loss2(score_pred, y_gt)
+            loss = loss1 + 1e-4 * loss2
         _, y_pred = torch.max(score_pred, -1)
         num_correct_pred = y_pred.eq(y_gt).sum()
         return loss, num_correct_pred, y_pred
