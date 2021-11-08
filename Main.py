@@ -19,7 +19,7 @@ def main():
     parser.add_argument('-version', type=str, default='1.3')
     parser.add_argument('-note', type=str, default='Adjust prediction layer.')
     parser.add_argument('-load_state', default=False)  # Provide state_dict path for testing or continue training
-    parser.add_argument('-save_state', default=False)  # Saving best or latest model state_dict
+    parser.add_argument('-save_state', default=True)  # Saving best or latest model state_dict
     parser.add_argument('-test_only', default=False)  # Enable to skip training session
     parser.add_argument('-test_original', default=False)  # Deprecated, model structure has changed
 
@@ -34,7 +34,8 @@ def main():
 
     parser.add_argument('-epoch', type=int, default=20)
     parser.add_argument('-num_workers', type=int, default=100)
-    parser.add_argument('-batch_size', type=int, default=4)
+    parser.add_argument('-batch_size', type=int, default=4
+                        )
     parser.add_argument('-manual_lr', default=False)
     parser.add_argument('-lr', type=float, default=1e-3)  # Enable manual_lr will override this lr
     parser.add_argument('-lr_patience', type=int, default=10)
@@ -43,7 +44,8 @@ def main():
     parser.add_argument('-gamma_steplr', type=float, default=np.sqrt(0.1))
 
     parser.add_argument('-resnet_pretrained', default=True)
-    parser.add_argument('-loss_type', default='LabelSmooth') # Other values can be CrossEntropy or CenterLoss
+    parser.add_argument('-loss_type', default='TripletLoss') # Other values can be CrossEntropy or CenterLoss or TripletLoss
+    parser.add_argument('-triplet_margin', default=0.1) # If TripletLoss is chosen as loss type
     # parser.add_argument('-resnet_freeze', default=False)
 
     opt = parser.parse_args()
@@ -74,7 +76,7 @@ def train(opt):
     # Import data
     data_getter = getter_dataloader(opt)
     opt.num_label = get_num_label(opt.data)
-
+    model_best_folds = None
     """ Iterate 10 folds """
     for fold in range(10):
 
@@ -175,20 +177,23 @@ def train(opt):
             torch.save(model_best, '_result/model/xxMusic-v' + opt.version + '-' +
                        time.strftime("-%b_%d_%H_%M", time.localtime()) + '.pth')
         print("\n------------------------ Finished fold:{fold} ------------------------\n".format(fold=fold))
+        break
 
+    model_best_folds = model_best
+    test(opt, model_best_folds,)
 
-# def test(opt, model, data_getter):
-#     print('\n[ Epoch testing ]')
-#
-#     with torch.no_grad():
-#         loss_test, acc_test, acc_test_voting = test_epoch(model, valloader, val_gt_voting, opt, dataset='test')
-#
-#     print('\n- [Info] Test loss:{loss: 8.4f}, accuracy:{acc: 8.4f}, voting accuracy:{voting: 8.4f}'
-#           .format(acc=acc_test, loss=loss_test, voting=acc_test_voting), )
-#
-#     with open(opt.log, 'a') as f:
-#         f.write('\nTest loss:{loss: 8.4f}, accuracy:{acc: 8.4f}, voting accuracy:{voting: 8.4f}'
-#                 .format(acc=acc_test, loss=loss_test, voting=acc_test_voting), )
+def test(opt, model, data_getter):
+    print('\n[ Epoch testing ]')
+
+    with torch.no_grad():
+        loss_test, acc_test, acc_test_voting = test_epoch(model, valloader, val_gt_voting, opt, dataset='test')
+
+    print('\n- [Info] Test loss:{loss: 8.4f}, accuracy:{acc: 8.4f}, voting accuracy:{voting: 8.4f}'
+          .format(acc=acc_test, loss=loss_test, voting=acc_test_voting), )
+
+    with open(opt.log, 'a') as f:
+        f.write('\nTest loss:{loss: 8.4f}, accuracy:{acc: 8.4f}, voting accuracy:{voting: 8.4f}'
+                .format(acc=acc_test, loss=loss_test, voting=acc_test_voting), )
 
 
 if __name__ == '__main__':
