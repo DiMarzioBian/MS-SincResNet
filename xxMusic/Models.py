@@ -9,7 +9,7 @@ import torchvision.models as models
 from xxMusic.Metrics import LabelSmoothingLoss
 from xxMusic.center_loss import CenterLoss
 from xxMusic.triplet_loss import TripletLoss
-
+from xxMusic.attention import Attention as Attn
 
 class SincConv_fast(nn.Module):
     """Sinc-based convolution
@@ -128,8 +128,8 @@ class SincConv_fast(nn.Module):
 class SpatialPyramidPool2D(nn.Module):
     def __init__(self):
         super(SpatialPyramidPool2D, self).__init__()
-        self.local_avg_pool = nn.AdaptiveAvgPool2d(output_size=(2, 2))
-        self.global_avg_pool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
+        self.local_avg_pool = nn.AdaptiveMaxPool2d(output_size=(2, 2))
+        self.global_avg_pool = nn.AdaptiveMaxPool2d(output_size=(1, 1))
 
     def forward(self, x):
         # local avg pooling, gives 512@2*2 feature
@@ -145,7 +145,7 @@ class SpatialPyramidPool2D(nn.Module):
 class SPP_Resnet(nn.Module):
     def __init__(self, pretrained=True, enable_spp=True):
         super(SPP_Resnet, self).__init__()
-
+        self.attn = Attn()
         if enable_spp:
             arch = list(models.resnet18(pretrained=pretrained).children())
             self.model = nn.Sequential(
@@ -158,9 +158,14 @@ class SPP_Resnet(nn.Module):
         else:
             self.model = models.resnet18(pretrained=pretrained)
             self.model.fc = nn.Linear(512, 10, bias=True)
+            self.modelfc2 = nn.Linear(200, 10, bias=True)
 
     def forward(self, x):
         x = self.model(x)
+        out = self.attn(x)
+        out = out.view(out.size(0), out.size(2), -1)
+        x = out.view(out.size(0), -1)
+        x = self.modelfc2(x)
         return x
 
 class xxMusic(nn.Module):
@@ -197,7 +202,7 @@ class xxMusic(nn.Module):
             self.calc_loss2 = CenterLoss(num_classes=8, feat_dim=10, use_gpu=True)
         elif self.loss_type=='TripletLoss':
             self.calc_loss = LabelSmoothingLoss(opt.smooth_label, opt.num_label)
-            self.calc_loss2 =  TripletLoss(margin=1.0, p=2., mining_type='all')
+            self.calc_loss2 =  TripletLoss(margin=opt.triplet_margin, p=2., mining_type='all')
 
     def forward(self, x):
         """ Feature extraction """
@@ -206,6 +211,7 @@ class xxMusic(nn.Module):
         feat1 = self.sincNet1(x)
         feat2 = self.sincNet2(x)
         feat3 = self.sincNet3(x)
+
 
         x = torch.cat((feat1.unsqueeze_(dim=1),
                        feat2.unsqueeze_(dim=1),
@@ -219,7 +225,7 @@ class xxMusic(nn.Module):
         loss = self.calc_loss(score_pred, y_gt)
         if self.loss_type=='CenterLoss':
             loss2 = self.calc_loss2(score_pred, y_gt)
-            loss = loss + 1e-4*loss2
+            loss = loss + 1e-3*loss2
         elif self.loss_type=='TripletLoss':
             loss2 = self.calc_loss2(score_pred, y_gt)[0]
             loss = loss + loss2
@@ -233,7 +239,7 @@ class xxMusic(nn.Module):
         loss = self.calc_loss(score_pred, y_gt)
         if self.loss_type == 'CenterLoss':
             loss2 = self.calc_loss2(score_pred, y_gt)
-            loss = loss + 1e-4 * loss2
+            loss = loss + 1e-3 * loss2
         elif self.loss_type == 'TripletLoss':
             loss2 = self.calc_loss2(score_pred, y_gt)[0]
             loss = loss + loss2
