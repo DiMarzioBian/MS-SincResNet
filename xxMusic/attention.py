@@ -46,16 +46,19 @@ class Attention(nn.Module):
         super(Attention, self).__init__()
         self.gamma = nn.Parameter(torch.zeros(1))
         self.softmax = nn.Softmax(dim=-1)
+        self.num_heads = 10
+        self.attention_dictionary_size = 20
+        self.fc0 = nn.Linear(10, 20, bias=False)
         self.fc1 = nn.Linear(self.attention_dictionary_size, self.attention_dictionary_size*self.num_heads, bias=False)
         self.fc2 = nn.Linear(self.attention_dictionary_size, self.attention_dictionary_size*self.num_heads, bias=False)
         self.fc3 = nn.Linear(self.attention_dictionary_size, self.attention_dictionary_size*self.num_heads, bias=False)
         self.fc4 = nn.Linear(self.attention_dictionary_size, self.attention_dictionary_size*self.num_heads, bias=False)
-        self.num_heads = 10
-        self.attention_dictionary_size = 20
+
 
     def forward(self, input):
         input = input.unsqueeze(1)
         batch, m, _= input.size()
+        input = self.fc0(input)
         query = self.fc1(input)
         query = query.view(self.num_heads, batch, m, self.attention_dictionary_size)
         keys = self.fc2(input).view(self.num_heads, batch, self.attention_dictionary_size, m)
