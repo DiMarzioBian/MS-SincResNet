@@ -11,23 +11,21 @@ from torchaudio.datasets.utils import download_url, extract_archive
 
 from preprocess.Dataset import getter_dataloader, get_num_label
 from Epoch import train_epoch, test_epoch
-from Utils import adjust_learning_rate
+from Utils import set_optimizer_lr, data_downloader
 
 
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-version', type=str, default='1.3.1')
-    parser.add_argument('-note', type=str, default='Set manual lr follow paper.')
+    parser.add_argument('-version', type=str, default='1.3.2')
+    parser.add_argument('-note', type=str, default='Add EBallroom.')
     parser.add_argument('-load_state', default=False)  # Provide state_dict path for testing or continue training
-    parser.add_argument('-save_state', default=False)  # Saving best or latest model state_dict
-    parser.add_argument('-test_only', default=False)  # Enable to skip training session
-    parser.add_argument('-test_original', default=False)  # Deprecated, model structure has changed
-
-    parser.add_argument('-enable_spp', default=True)  # Enable SPP layer instead of ResNet fc layer directly
+    parser.add_argument('-save_state', type=bool, default=False)  # Saving best or latest model state_dict
+    parser.add_argument('-test_only', type=bool, default=False)  # Enable to skip training session
+    parser.add_argument('-enable_spp', type=bool, default=True)  # Enable SPP layer instead of ResNet fc layer directly
 
     parser.add_argument('-data', default='GTZAN')  # ranging from 0 to 9, integer
-    parser.add_argument('-enable_data_filtered', default=False)  # Enable data filtering
+    parser.add_argument('-enable_data_filtered', default=True)  # Enable data filtering
     parser.add_argument('-download', default=True)  # Download dataset
     parser.add_argument('-sample_rate', type=int, default=16000)
     parser.add_argument('-hop_gap', type=float, default=0.5)  # time gap between each adjacent splits in a track
@@ -36,9 +34,9 @@ def main():
     parser.add_argument('-smooth_label', type=float, default=0.3)
 
     parser.add_argument('-epoch', type=int, default=200)
-    parser.add_argument('-num_workers', type=int, default=8)
+    parser.add_argument('-num_workers', type=int, default=2)
     parser.add_argument('-batch_size', type=int, default=60)
-    parser.add_argument('-manual_lr', default=False)
+    parser.add_argument('-manual_lr', type=bool, default=True)
     parser.add_argument('-lr', type=float, default=1e-3)  # Enable manual_lr will override this lr
     parser.add_argument('-lr_patience', type=int, default=10)
     parser.add_argument('-l2_reg', type=float, default=1e-5)
@@ -52,32 +50,18 @@ def main():
     opt.device = torch.device('cuda')
     opt.log = '_result/log/v' + opt.version + time.strftime("-%b_%d_%H_%M", time.localtime()) + '.txt'
 
-    # Test the original pretrained MS-SincResNet
-    if opt.test_original:
-        opt.save_state = False
-        opt.test_only = True
-        opt.load_state = "_trained/MS-SincResNet.tar"
-        opt.data = 'GTZAN'
-
     print('\n[Info] Model settings:\n')
     for k, v in vars(opt).items():
         print('         %s: %s' % (k, v))
 
     # Download dataset
     if opt.download:
-        if opt.data == 'GTZAN':
+        data_downloader(opt.data)
 
-            root = '_data/GTZAN/'
-            url = "http://opihi.cs.uvic.ca/sound/genres.tar.gz"
-            _checksums = {"http://opihi.cs.uvic.ca/sound/genres.tar.gz": "5b3d6dddb579ab49814ab86dba69e7c7"}
-
-            archive = os.path.basename(url)
-            archive = os.path.join(root, archive)
-            if not os.path.isdir(os.path.join(root, 'genres')):
-                if not os.path.isfile(archive):
-                    checksum = _checksums.get(url, None)
-                    download_url(url, root, hash_value=checksum, hash_type="md5")
-                extract_archive(archive)
+    if opt.manual_lr:
+        opt.lr = 0.005
+        opt.lr_patience = 30
+        opt.gamma_steplr = 0.5
 
     # Run model
     train(opt)
@@ -99,24 +83,21 @@ def train(opt):
 
     """ Iterate 10 folds """
     for fold in range(10):
-
         print("\n------------------------ Start fold:{fold} ------------------------\n".format(fold=fold))
         with open(opt.log, 'a') as f:
             f.write("\n------------------------ Start fold:{fold} ------------------------\n".format(fold=fold), )
-
             f.write('\nEpoch, Time, loss_tr, acc_tr, loss_val, acc_val, acc_val_voting\n')
 
         # Load Music model
         model = xxMusic(opt)
-
         if opt.load_state:
             model.load_state_dict(torch.load(opt.load_state)['state_dict'])
-
         model.to(opt.device)
 
         optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()), lr=opt.lr, momentum=0.9,
                               weight_decay=opt.l2_reg, nesterov=True)
-        # optimizer = optim.Adam(filter(lambda x: x.requires_grad, model.parameters()), lr=opt.lr, weight_decay=opt.l2_reg)
+        # optimizer = optim.Adam(filter(lambda x: x.requires_grad, model.parameters()), lr=opt.lr,
+        #                        weight_decay=opt.l2_reg)
         scheduler = optim.lr_scheduler.StepLR(optimizer, int(opt.lr_patience), gamma=opt.gamma_steplr)
 
         # Load data
@@ -134,17 +115,26 @@ def train(opt):
             print('\n[ Epoch {epoch}]'.format(epoch=epoch))
 
             """ Training """
-            start = time.time()
-
             if opt.manual_lr:
-                adjust_learning_rate(optimizer, epoch)
+                if epoch <= 5:
+                    set_optimizer_lr(optimizer, 1e-5)
+                elif epoch == 6:
+                    set_optimizer_lr(optimizer, opt.lr)
 
+            start = time.time()
             loss_train, acc_train = train_epoch(model, trainloader, opt, optimizer)
             end = time.time()
+
             trainloader.dataset.shuffle()
 
-            if not opt.manual_lr:
+            if opt.manual_lr:
+                if epoch >= 6:
+                    optimizer.step()
+                    scheduler.step()
+            else:
+                optimizer.step()
                 scheduler.step()
+            print(optimizer.param_groups[0]['lr'])
 
             print('\n- (Training) Loss:{loss: 8.5f}, accuracy:{acc: 8.4f}, elapse:{elapse:3.4f} min'
                   .format(loss=loss_train, acc=acc_train, elapse=(time.time() - start) / 60))
@@ -164,7 +154,7 @@ def train(opt):
                                 loss_val=loss_val, acc_val=acc_val, acc_val_voting=acc_val_voting), )
 
             """ Early stopping """
-            if (best_acc_voting <= acc_val_voting) & (best_loss >= loss_val):
+            if (best_acc_voting < acc_val_voting) or ((best_acc_voting == acc_val_voting) & (best_loss >= loss_val)):
                 best_acc = acc_val
                 best_loss = loss_val
                 best_acc_voting = acc_val_voting
@@ -208,6 +198,10 @@ def train(opt):
         f.write("\n[Info] Average cross validation loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
                 "and best voting accuracy: {voting: 8.4f}\n"
                 .format(loss=np.mean(cv_loss), acc=np.mean(cv_acc), voting=np.mean(cv_acc_voting)), )
+    print('\n[Info] 10-fold average loss: {loss: 8.5f}, average accuracy: {acc: 8.4f}, '
+          'average voting accuracy: {voting: 8.4f}\n'
+          .format(loss=np.mean(cv_loss), acc=np.mean(cv_acc), voting=np.mean(cv_acc_voting)), )
+    print('\n------------------------ Finished. ------------------------\n')
 
 # def test(opt, model, data_getter):
 #     print('\n[ Epoch testing ]')
@@ -230,4 +224,3 @@ if __name__ == '__main__':
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     main()
-    print('\n------------------------ Finished. ------------------------\n')

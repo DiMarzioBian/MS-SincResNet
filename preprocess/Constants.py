@@ -1,4 +1,4 @@
-filtered_all = [
+GTZAN_filtered = [
     "blues.00012",
     "blues.00013",
     "blues.00014",

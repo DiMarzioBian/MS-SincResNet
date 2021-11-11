@@ -26,10 +26,7 @@ def train_epoch(model, data, opt, optimizer):
 
         loss_batch, num_pred_correct_batch = model.loss(wave, y_gt)
         loss = loss_batch / batch.__len__()
-
         loss.backward()
-        if not opt.manual_lr:
-            optimizer.step()
 
         num_pred_correct_epoch += num_pred_correct_batch
         loss_epoch += loss_batch

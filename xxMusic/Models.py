@@ -141,7 +141,7 @@ class SpatialPyramidPool2D(nn.Module):
 
 
 class SPP_Resnet(nn.Module):
-    def __init__(self, pretrained=True, enable_spp=True):
+    def __init__(self, num_label, pretrained=True, enable_spp=True):
         super(SPP_Resnet, self).__init__()
 
         if enable_spp:
@@ -151,11 +151,11 @@ class SPP_Resnet(nn.Module):
                 arch[-3:-2][0][0],
                 nn.Sequential(*list(arch[-3:-2][0][1].children())[:-1]),
                 SpatialPyramidPool2D(),
-                nn.Linear(2560, 10, bias=True)
+                nn.Linear(2560, num_label, bias=True)
             )
         else:
             self.model = models.resnet18(pretrained=pretrained)
-            self.model.fc = nn.Linear(512, 10, bias=True)
+            self.model.fc = nn.Linear(512, num_label, bias=True)
 
     def forward(self, x):
         x = self.model(x)
@@ -167,6 +167,7 @@ class xxMusic(nn.Module):
         super(xxMusic, self).__init__()
         self.resnet_pretrained = opt.resnet_pretrained
         self.enable_spp = opt.enable_spp
+        self.num_label = opt.num_label
 
         self.layerNorm = nn.LayerNorm([1, 3*opt.sample_rate])
         self.sincNet1 = nn.Sequential(
@@ -184,7 +185,7 @@ class xxMusic(nn.Module):
             nn.BatchNorm1d(160),
             nn.ReLU(inplace=True),
             nn.AdaptiveAvgPool1d(1024))
-        self.spp_resnet = SPP_Resnet(pretrained=self.resnet_pretrained, enable_spp=self.enable_spp)
+        self.spp_resnet = SPP_Resnet(self.num_label, pretrained=self.resnet_pretrained, enable_spp=self.enable_spp)
 
         self.calc_loss = LabelSmoothingLoss(opt.smooth_label, opt.num_label)
 
