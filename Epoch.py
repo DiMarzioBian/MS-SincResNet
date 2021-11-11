@@ -22,8 +22,6 @@ def train_epoch(model, data, opt, optimizer):
         wave, y_gt = map(lambda x: x.to(opt.device), batch)
 
         """ training """
-        optimizer.zero_grad()
-
         loss_batch, num_pred_correct_batch = model.loss(wave, y_gt)
         loss = loss_batch / batch.__len__()
         loss.backward()

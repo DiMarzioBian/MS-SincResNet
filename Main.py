@@ -17,7 +17,7 @@ from Utils import set_optimizer_lr, data_downloader
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-version', type=str, default='1.3.2')
+    parser.add_argument('-version', type=str, default='1.4')
     parser.add_argument('-note', type=str, default='Add EBallroom.')
     parser.add_argument('-load_state', default=False)  # Provide state_dict path for testing or continue training
     parser.add_argument('-save_state', type=bool, default=False)  # Saving best or latest model state_dict
@@ -34,10 +34,9 @@ def main():
     parser.add_argument('-smooth_label', type=float, default=0.3)
 
     parser.add_argument('-epoch', type=int, default=200)
-    parser.add_argument('-num_workers', type=int, default=2)
+    parser.add_argument('-num_workers', type=int, default=4)
     parser.add_argument('-batch_size', type=int, default=60)
-    parser.add_argument('-manual_lr', type=bool, default=True)
-    parser.add_argument('-lr', type=float, default=1e-3)  # Enable manual_lr will override this lr
+    parser.add_argument('-lr', type=float, default=1e-3)
     parser.add_argument('-lr_patience', type=int, default=10)
     parser.add_argument('-l2_reg', type=float, default=1e-5)
     parser.add_argument('-es_patience', type=int, default=15)
@@ -57,11 +56,6 @@ def main():
     # Download dataset
     if opt.download:
         data_downloader(opt.data)
-
-    if opt.manual_lr:
-        opt.lr = 0.005
-        opt.lr_patience = 30
-        opt.gamma_steplr = 0.5
 
     # Run model
     train(opt)
@@ -115,26 +109,16 @@ def train(opt):
             print('\n[ Epoch {epoch}]'.format(epoch=epoch))
 
             """ Training """
-            if opt.manual_lr:
-                if epoch <= 5:
-                    set_optimizer_lr(optimizer, 1e-5)
-                elif epoch == 6:
-                    set_optimizer_lr(optimizer, opt.lr)
-
             start = time.time()
             loss_train, acc_train = train_epoch(model, trainloader, opt, optimizer)
             end = time.time()
-
             trainloader.dataset.shuffle()
 
-            if opt.manual_lr:
-                if epoch >= 6:
-                    optimizer.step()
-                    scheduler.step()
-            else:
-                optimizer.step()
-                scheduler.step()
-            print(optimizer.param_groups[0]['lr'])
+            optimizer.step()
+            scheduler.step()
+
+            optimizer.zero_grad()
+            print("\n- lr =", str(optimizer.param_groups[0]['lr']))
 
             print('\n- (Training) Loss:{loss: 8.5f}, accuracy:{acc: 8.4f}, elapse:{elapse:3.4f} min'
                   .format(loss=loss_train, acc=acc_train, elapse=(time.time() - start) / 60))
