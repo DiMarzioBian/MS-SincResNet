@@ -32,7 +32,7 @@ class LabelSmoothingLoss(nn.Module):
         log_prb = F.log_softmax(y_pred, dim=-1)
         loss = -(one_hot_smooth * log_prb).sum(dim=-1)
 
-        return loss.sum()
+        return loss
 
 
 def calc_voting_accuracy(y_pred: torch.Tensor, y_gt: torch.Tensor, sample_splits_per_track: int):

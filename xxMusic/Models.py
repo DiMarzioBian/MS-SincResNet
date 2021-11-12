@@ -209,7 +209,7 @@ class xxMusic(nn.Module):
         loss = self.calc_loss(score_pred, y_gt)
         _, y_pred = torch.max(score_pred, -1)
         num_correct_pred = y_pred.eq(y_gt).sum()
-        return loss, num_correct_pred
+        return loss.mean(), num_correct_pred
 
     def predict(self, wave, y_gt):
         """ Predict data label and compute loss"""
@@ -217,5 +217,5 @@ class xxMusic(nn.Module):
         loss = self.calc_loss(score_pred, y_gt)
         _, y_pred = torch.max(score_pred, -1)
         num_correct_pred = y_pred.eq(y_gt).sum()
-        return loss, num_correct_pred, y_pred
+        return loss.mean(), num_correct_pred, y_pred
 
