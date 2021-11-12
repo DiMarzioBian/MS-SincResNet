@@ -49,7 +49,7 @@ class EBallroom_3s(Dataset):
                  augment: bool = False,
                  root: str = '_data/EBallroom/',):
         """
-        Instancelize GTZAN, indexing clips by enlarged indices and map label to integers.
+        Instancelize extended ballroom, indexing clips by enlarged indices and map label to integers.
         """
         self._walker = list_filename
 
@@ -121,13 +121,11 @@ def get_EBallroom_dataloader(opt: argparse.Namespace, train_list: list, val_list
     if opt.is_distributed:
         # Instancelize sampler
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_data)
-        val_sampler = torch.utils.data.distributed.DistributedSampler(val_data, shuffle=False)
 
         # Instancelize dataloader
         train_loader = DataLoader(train_data, batch_size=opt.batch_size, num_workers=opt.num_workers,
                                   sampler=train_sampler)
-        val_loader = DataLoader(val_data, batch_size=opt.batch_size, num_workers=opt.num_workers,
-                                sampler=val_sampler)
+        val_loader = DataLoader(val_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=False)
 
     else:
         # Instancelize dataloader

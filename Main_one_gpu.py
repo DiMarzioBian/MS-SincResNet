@@ -21,12 +21,12 @@ def main():
     """
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--version', type=str, default='1.5.1')
-    parser.add_argument('--note', type=str, default='Minor bug fixes, multiple GPU logging need update.')
-    parser.add_argument('--enable_spp', type=bool, default=True)  # Enable SPP layer instead of ResNet fc layer directly
+    parser.add_argument('--version', type=str, default='1.6')
+    parser.add_argument('--note', type=str, default='Add 2 loss.')
+    parser.add_argument('--enable_spp', type=bool, default=False)  # Enable SPP layer instead of ResNet fc layer directly
 
     parser.add_argument('--data', default='GTZAN')  # ranging from 0 to 9, integer
-    parser.add_argument('--enable_data_filtered', default=True)  # Enable data filtering
+    parser.add_argument('--enable_data_filtered', default=False)  # Enable data filtering
     parser.add_argument('--download', default=True)  # Download dataset
     parser.add_argument('--sample_rate', type=int, default=16000)
     parser.add_argument('--hop_gap', type=float, default=0.5)  # time gap between each adjacent splits in a track
@@ -35,8 +35,8 @@ def main():
     parser.add_argument('--smooth_label', type=float, default=0.3)
 
     parser.add_argument('--epoch', type=int, default=200)
-    parser.add_argument('--num_workers', type=int, default=4)
-    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--num_workers', type=int, default=6)
+    parser.add_argument('--batch_size', type=int, default=60)
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--lr_patience', type=int, default=10)
     parser.add_argument('--l2_reg', type=float, default=1e-5)
@@ -45,6 +45,9 @@ def main():
 
     parser.add_argument('--resnet_pretrained', default=True)
     parser.add_argument('--is_distributed', type=bool, default=False)
+
+    parser.add_argument('--loss_type', default='TripletLoss') # Other values can be CrossEntropy or CenterLoss or TripletLoss
+    parser.add_argument('--triplet_margin', default=0.1) # If TripletLoss is chosen as loss type
 
     opt = parser.parse_args()
     opt.log = '_result/log/v' + opt.version + time.strftime("-%b_%d_%H_%M", time.localtime()) + '.txt'

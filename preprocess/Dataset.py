@@ -1,6 +1,7 @@
 import os
 from preprocess.Dataset_GTZAN import *
 from preprocess.Dataset_EBallroom import *
+from preprocess.Dataset_FMA_small import *
 from sklearn.model_selection import StratifiedKFold
 
 from preprocess.Constants import *
@@ -48,7 +49,6 @@ class getter_dataloader(object):
             self.get_labels = get_EBallroom_labels
 
         elif dataset == 'FMA_small':
-            label = []
             raise RuntimeError('Dataset ' + dataset + ' not loaded so far!')
         else:
             raise RuntimeError('Dataset ' + dataset + ' not found!')

@@ -16,6 +16,8 @@ from Utils import set_optimizer_lr, data_downloader
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 
+from tqdm import tqdm
+
 
 def main():
     """
@@ -61,9 +63,10 @@ def main():
     dist.init_process_group(backend='nccl')
 
     # Print hyperparameters and settings
-    print('\n[Info] Model settings:\n')
-    for k, v in vars(opt).items():
-        print('         %s: %s' % (k, v))
+    if opt.local_rank == 0:
+        print('\n[Info] Model settings:\n')
+        for k, v in vars(opt).items():
+            print('         %s: %s' % (k, v))
 
     with open(opt.log, 'a') as f:
         # Save hyperparameters
@@ -83,10 +86,11 @@ def main():
 
     """ Iterate 10 folds """
     for fold in range(10):
-        print("\n------------------------ Start fold:{fold} ------------------------\n".format(fold=fold))
-        with open(opt.log, 'a') as f:
-            f.write("\n------------------------ Start fold:{fold} ------------------------\n".format(fold=fold), )
-            f.write('\nEpoch, Time, loss_tr, acc_tr, loss_val, acc_val, acc_val_voting\n')
+        if opt.local_rank == 0:
+            print("\n------------------------ Start fold:{fold} ------------------------\n".format(fold=fold))
+            with open(opt.log, 'a') as f:
+                f.write("\n------------------------ Start fold:{fold} ------------------------\n".format(fold=fold), )
+                f.write('\nEpoch, Time, loss_tr, acc_tr, loss_val, acc_val, acc_val_voting\n')
 
         # Load Music model
         model = xxMusic(opt).to(opt.local_rank)
@@ -96,7 +100,8 @@ def main():
         scheduler = optim.lr_scheduler.StepLR(optimizer, int(opt.lr_patience), gamma=opt.gamma_steplr)
 
         # Load data
-        print('\n[Info] Loading data...')
+        if opt.local_rank == 0:
+            print('\n[Info] Loading data...')
         trainloader, valloader, val_gt_voting = data_getter.get(fold)
 
         # Define logging variants
@@ -107,7 +112,9 @@ def main():
         model_best = None
 
         for epoch in range(1, opt.epoch + 1):
-            print('\n[ Epoch {epoch}]'.format(epoch=epoch))
+
+            if opt.local_rank == 0:
+                print('\n[ Epoch {epoch}]'.format(epoch=epoch))
 
             # """ Training """
             start = time.time()
@@ -118,65 +125,69 @@ def main():
 
             end = time.time()
 
-            print('\n- (Training) Loss:{loss: 8.5f}, accuracy:{acc: 8.4f}, elapse:{elapse:3.4f} min'
-                  .format(loss=loss_train, acc=acc_train, elapse=(time.time() - start) / 60))
+            if opt.local_rank == 0:
 
-            """ Validating """
-            with torch.no_grad():
-                loss_val, acc_val, acc_val_voting = test_epoch(model, valloader, val_gt_voting, opt, dataset='val')
+                print('\n- (Training) Loss:{loss: 8.5f}, accuracy:{acc: 8.4f}, elapse:{elapse:3.4f} min'
+                      .format(loss=loss_train, acc=acc_train, elapse=(time.time() - start) / 60))
 
-            print('\n- (Validating) Loss:{loss: 8.5f}, accuracy:{acc: 8.4f} and voting accuracy:{voting: 8.4f}'
-                  .format(loss=loss_val, acc=acc_val, voting=acc_val_voting))
+                """ Validating """
+                with torch.no_grad():
+                    loss_val, acc_val, acc_val_voting = test_epoch(model, valloader, val_gt_voting, opt, dataset='val')
 
-            """ Logging """
-            with open(opt.log, 'a') as f:
-                f.write('{epoch}, {time: 8.4f}, {loss_train: 8.5f}, {acc_train: 8.4f}, {loss_val: 8.5f}, '
-                        '{acc_val: 8.4f}, {acc_val_voting: 8.4f}\n'
-                        .format(epoch=epoch, time=(end - start) / 60, loss_train=loss_train, acc_train=acc_train,
-                                loss_val=loss_val, acc_val=acc_val, acc_val_voting=acc_val_voting), )
+                print('\n- (Validating) Loss:{loss: 8.5f}, accuracy:{acc: 8.4f} and voting accuracy:{voting: 8.4f}'
+                      .format(loss=loss_val, acc=acc_val, voting=acc_val_voting))
 
-            """ Early stopping """
-            if (best_acc_voting < acc_val_voting) or ((best_acc_voting == acc_val_voting) & (best_loss >= loss_val)):
-                best_acc = acc_val
-                best_loss = loss_val
-                best_acc_voting = acc_val_voting
-                patience = 0
-                print("\n- New best performance logged.")
-            else:
-                patience += 1
-                print("\n- Early stopping patience counter {} of {}".format(patience, opt.es_patience))
+                """ Logging """
+                with open(opt.log, 'a') as f:
+                    f.write('{epoch}, {time: 8.4f}, {loss_train: 8.5f}, {acc_train: 8.4f}, {loss_val: 8.5f}, '
+                            '{acc_val: 8.4f}, {acc_val_voting: 8.4f}\n'
+                            .format(epoch=epoch, time=(end - start) / 60, loss_train=loss_train, acc_train=acc_train,
+                                    loss_val=loss_val, acc_val=acc_val, acc_val_voting=acc_val_voting), )
 
-                if patience == opt.es_patience:
-                    print("\n[Info] Stop training")
-                    break
+                """ Early stopping """
+                if (best_acc_voting < acc_val_voting) or ((best_acc_voting == acc_val_voting) & (best_loss >= loss_val)):
+                    best_acc = acc_val
+                    best_loss = loss_val
+                    best_acc_voting = acc_val_voting
+                    patience = 0
+                    print("\n- New best performance logged.")
+                else:
+                    patience += 1
+                    print("\n- Early stopping patience counter {} of {}".format(patience, opt.es_patience))
+
+                    if patience == opt.es_patience:
+                        print("\n[Info] Stop training")
+                        break
 
         """ Logging """
         cv_loss[fold] = best_loss
         cv_acc[fold] = best_acc
         cv_acc_voting[fold] = best_acc_voting
 
-        print("\n[Info] Training stopped with best loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
-              "and best voting accuracy: {voting: 8.4f}\n"
-              .format(loss=best_loss, acc=best_acc, voting=best_acc_voting), )
+        if opt.local_rank == 0:
+            print("\n[Info] Training stopped with best loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
+                  "and best voting accuracy: {voting: 8.4f}\n"
+                  .format(loss=best_loss, acc=best_acc, voting=best_acc_voting), )
 
+            with open(opt.log, 'a') as f:
+                f.write("\n[Info] Training stopped with best loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
+                        "and best voting accuracy: {voting: 8.4f}"
+                        .format(loss=best_loss, acc=best_acc, voting=best_acc_voting), )
+
+                f.write("\n------------------------ Finished fold:{fold} ------------------------\n"
+                        .format(fold=fold), )
+            print("\n------------------------ Finished fold:{fold} ------------------------\n".format(fold=fold))
+
+    if opt.local_rank == 0:
+        """ Final logging """
         with open(opt.log, 'a') as f:
-            f.write("\n[Info] Training stopped with best loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
-                    "and best voting accuracy: {voting: 8.4f}"
-                    .format(loss=best_loss, acc=best_acc, voting=best_acc_voting), )
-
-            f.write("\n------------------------ Finished fold:{fold} ------------------------\n"
-                    .format(fold=fold), )
-        print("\n------------------------ Finished fold:{fold} ------------------------\n".format(fold=fold))
-
-    """ Final logging """
-    with open(opt.log, 'a') as f:
-        f.write("\n[Info] Average cross validation loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
-                "and best voting accuracy: {voting: 8.4f}\n"
-                .format(loss=np.mean(cv_loss), acc=np.mean(cv_acc), voting=np.mean(cv_acc_voting)), )
-    print('\n[Info] 10-fold average loss: {loss: 8.5f}, average accuracy: {acc: 8.4f}, '
-          'average voting accuracy: {voting: 8.4f}\n'
-          .format(loss=np.mean(cv_loss), acc=np.mean(cv_acc), voting=np.mean(cv_acc_voting)), )
-    print('\n------------------------ Finished. ------------------------\n')
+            f.write("\n[Info] Average cross validation loss: {loss: 8.5f}, best accuracy: {acc: 8.4f} "
+                    "and best voting accuracy: {voting: 8.4f}\n"
+                    .format(loss=np.mean(cv_loss), acc=np.mean(cv_acc), voting=np.mean(cv_acc_voting)), )
+        print('\n[Info] 10-fold average loss: {loss: 8.5f}, average accuracy: {acc: 8.4f}, '
+              'average voting accuracy: {voting: 8.4f}\n'
+              .format(loss=np.mean(cv_loss), acc=np.mean(cv_acc), voting=np.mean(cv_acc_voting)), )
+        print('\n------------------------ Finished. ------------------------\n')
 
 # def test(opt, model, data_getter):
 #     print('\n[ Epoch testing ]')

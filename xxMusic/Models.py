@@ -7,6 +7,8 @@ import torch.nn.functional as F
 import torchvision.models as models
 
 from xxMusic.Metrics import LabelSmoothingLoss
+from xxMusic.center_loss import CenterLoss
+from xxMusic.triplet_loss import TripletLoss
 
 
 class SincConv_fast(nn.Module):
@@ -168,6 +170,7 @@ class xxMusic(nn.Module):
         self.resnet_pretrained = opt.resnet_pretrained
         self.enable_spp = opt.enable_spp
         self.num_label = opt.num_label
+        self.loss_type = opt.loss_type
 
         self.layerNorm = nn.LayerNorm([1, 3*opt.sample_rate])
         self.sincNet1 = nn.Sequential(
@@ -188,6 +191,10 @@ class xxMusic(nn.Module):
         self.spp_resnet = SPP_Resnet(self.num_label, pretrained=self.resnet_pretrained, enable_spp=self.enable_spp)
 
         self.calc_loss = LabelSmoothingLoss(opt.smooth_label, opt.num_label)
+        if self.loss_type == 'CenterLoss':
+            self.calc_loss2 = CenterLoss(num_classes=opt.num_label, feat_dim=10, use_gpu=True)
+        elif self.loss_type == 'TripletLoss':
+            self.calc_loss2 = TripletLoss(margin=opt.triplet_margin, p=2., mining_type='all')
 
     def forward(self, x):
         """ Feature extraction """
@@ -207,6 +214,13 @@ class xxMusic(nn.Module):
         """ Compute loss """
         score_pred, *_ = self.forward(wave)
         loss = self.calc_loss(score_pred, y_gt)
+        if self.loss_type == 'CenterLoss':
+            loss2 = self.calc_loss2(score_pred, y_gt)
+            loss = loss + 1e-3*loss2
+        elif self.loss_type == 'TripletLoss':
+            loss2 = self.calc_loss2(score_pred, y_gt)[0]
+            loss = loss + loss2
+
         _, y_pred = torch.max(score_pred, -1)
         num_correct_pred = y_pred.eq(y_gt).sum()
         return loss.mean(), num_correct_pred
@@ -215,6 +229,13 @@ class xxMusic(nn.Module):
         """ Predict data label and compute loss"""
         score_pred, *_ = self.forward(wave)
         loss = self.calc_loss(score_pred, y_gt)
+        if self.loss_type == 'CenterLoss':
+            loss2 = self.calc_loss2(score_pred, y_gt)
+            loss = loss + 1e-3 * loss2
+        elif self.loss_type == 'TripletLoss':
+            loss2 = self.calc_loss2(score_pred, y_gt)[0]
+            loss = loss + loss2
+
         _, y_pred = torch.max(score_pred, -1)
         num_correct_pred = y_pred.eq(y_gt).sum()
         return loss.mean(), num_correct_pred, y_pred

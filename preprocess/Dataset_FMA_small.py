@@ -1,7 +1,6 @@
-import os
 from typing import Tuple
+import os
 import random
-
 from scipy import signal
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -9,54 +8,40 @@ import torchaudio
 import argparse
 
 
-mapper_genre = {
-    "blues": 0,
-    "classical": 1,
-    "country": 2,
-    "disco": 3,
-    "hiphop": 4,
-    "jazz": 5,
-    "metal": 6,
-    "pop": 7,
-    "reggae": 8,
-    "rock": 9,
-}
-
-
-def load_gtzan_item(filename: str, path: str, ext_audio: str = ".wav") -> Tuple[torch.Tensor, int, str]:
+def load_FMA_small_item(filename: str, path: str, ext_audio: str = ".mp3") -> Tuple[torch.Tensor, int, str]:
     """
     Loads a file from the dataset and returns the raw waveform
     as a Torch Tensor, its sample rate as an integer, and its
     genre as a string.
     """
     # Filenames are of the form label.id, e.g. blues.00078
-    label, _ = filename.split(".")
+    label, *_ = filename.split(".")
 
     # Read wav
-    file_audio = os.path.join(path, label, filename + ext_audio)
+    file_audio = os.path.join(path, label, filename[:-4] + ext_audio)
     waveform, sample_rate = torchaudio.load(file_audio)
 
     return waveform, sample_rate, label
 
 
-class GTZAN_3s(Dataset):
+class FMA_small_3s(Dataset):
     """ Event stream dataset. """
 
     def __init__(self,
                  list_filename: list,
                  new_sr: int,
-                 sigma_gnoise: int = 0,
+                 sigma_gnoise: int = 0.01,
                  hop_gap: float = 0.5,
                  sample_splits_per_track: int = 100,
                  augment: bool = False,
-                 root: str = '_data/GTZAN/',):
+                 root: str = '_data/fma_small/',):
         """
-        Instancelize GTZAN, indexing clips by enlarged indices and map label to integers.
+        Instancelize FMA small, indexing clips by enlarged indices and map label to integers.
         """
         self._walker = list_filename
 
         self.root = root
-        self.old_sr = 22050
+        # self.old_sr = 22050
         self.new_sr = new_sr  # 16000
         self.sigma_gnoise = sigma_gnoise
         self.hop_gap = hop_gap
@@ -65,14 +50,10 @@ class GTZAN_3s(Dataset):
 
         self.num_label = len(mapper_genre)
         self.total_num_splits = int(30.5 // (3+hop_gap))
-        self._ext_audio = ".wav"
+        self._ext_audio = ".mp3"
 
-        self._path = os.path.join(root, 'genres')
-
-        if not os.path.isdir(self._path):
-            raise RuntimeError(
-                "Dataset not found. Please use `download=True` to download it."
-            )
+        # Discard cateogries: , 'Pasodoble', 'Salsa', Slowwaltz', 'Wcswing' to keep datset updpeedm
+        self.label = ['chacha', 'jive', 'quickstep', 'rumba', 'samba', 'tango', 'viennesewaltz', 'waltz', 'foxtrot']
 
         self.length = len(self._walker) * self.sample_splits_per_track
 
@@ -90,8 +71,8 @@ class GTZAN_3s(Dataset):
         index_full, index_table_split = divmod(index, self.sample_splits_per_track)
         index_split = self.table_random[index_full][index_table_split]
 
-        wave, sr, genre_str = load_gtzan_item(self._walker[index_full], self._path, self._ext_audio)
-        wave = signal.resample(wave.squeeze(0).detach().numpy(), self.new_sr * 30)
+        wave, sr, genre_str = load_EBallroom_item(self._walker[index_full], self.root, ".mp3")
+        wave = signal.resample(wave.mean(0).detach().numpy(), self.new_sr * 30)
 
         start = int((3+self.hop_gap) * index_split * self.new_sr)
         end = int(start + 3*self.new_sr)
@@ -108,7 +89,7 @@ class GTZAN_3s(Dataset):
             self.table_random[i] = random.sample(range(self.total_num_splits), self.sample_splits_per_track)
 
 
-def get_GTZAN_dataloader(opt: argparse.Namespace, train_list: list, val_list: list):
+def get_EBallroom_dataloader(opt: argparse.Namespace, train_list: list, val_list: list):
     """ Load data and prepare dataloader. """
 
     # Calculate how many 3s clips could be extracted from a 30s track as available maximum of 3s clips
@@ -118,11 +99,11 @@ def get_GTZAN_dataloader(opt: argparse.Namespace, train_list: list, val_list: li
         opt.sample_splits_per_track = opt.total_num_splits
 
     # Instancelize dataset
-    train_data = GTZAN_3s(list_filename=train_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
-                          hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=True)
+    train_data = EBallroom_3s(list_filename=train_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
+                              hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=True)
 
-    val_data = GTZAN_3s(list_filename=val_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
-                        hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=False)
+    val_data = EBallroom_3s(list_filename=val_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
+                            hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=False)
 
     if opt.is_distributed:
         # Instancelize sampler
@@ -141,6 +122,7 @@ def get_GTZAN_dataloader(opt: argparse.Namespace, train_list: list, val_list: li
     return train_loader, val_loader
 
 
-def get_GTZAN_labels(list_filename: list):
+def get_EBallroom_labels(list_filename):
     """ Return filtered_all file genre """
-    return torch.IntTensor([mapper_genre[s[:-6]] for s in list_filename])
+    return torch.IntTensor([mapper_genre[s[:-11]] for s in list_filename])
+
