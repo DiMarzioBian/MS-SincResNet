@@ -1,4 +1,5 @@
 import os
+import pickle
 from preprocess.Dataset_GTZAN import *
 from preprocess.Dataset_EBallroom import *
 from preprocess.Dataset_FMA_small import *
@@ -34,7 +35,11 @@ class getter_dataloader(object):
             self.get_labels = get_GTZAN_labels
 
         elif dataset == 'EBallroom':
-            label = ['chacha', 'jive', 'quickstep', 'rumba', 'samba', 'tango', 'viennesewaltz', 'waltz', 'foxtrot']
+            if enable_data_filtered:
+                label = ['chacha', 'jive', 'quickstep', 'rumba', 'samba', 'tango', 'viennesewaltz', 'waltz', 'foxtrot']
+            else:
+                label = ['chacha', 'jive', 'quickstep', 'rumba', 'samba', 'tango', 'viennesewaltz', 'waltz', 'foxtrot',
+                         'pasodoble', 'salsa', 'slowwaltz', 'wcswing']
             unfiltered_all = []
             data_labels = []
             for lbl in label:
@@ -49,7 +54,12 @@ class getter_dataloader(object):
             self.get_labels = get_EBallroom_labels
 
         elif dataset == 'FMA_small':
-            raise RuntimeError('Dataset ' + dataset + ' not loaded so far!')
+            with open('_data/FMA_small/track_genre.pkl', 'rb') as f:
+                dict_track_genre = pickle.load(f)
+            self.data_labels = list(dict_track_genre.values())
+            self.data_filename = list(dict_track_genre.keys())
+            self.get_dataset_dataloader = get_FMA_small_dataloader
+            self.get_labels = get_FMA_small_labels
         else:
             raise RuntimeError('Dataset ' + dataset + ' not found!')
 
@@ -71,11 +81,14 @@ class getter_dataloader(object):
                 return train_loader, val_loader, val_gt_voting
 
 
-def get_num_label(dataset: str):
+def get_num_label(dataset: str, enable_data_filtered):
     if dataset == 'GTZAN':
         return 10
     elif dataset == 'EBallroom':
-        return 9
+        if enable_data_filtered:
+            return 9
+        else:
+            return 13
     elif dataset == 'FMA_small':
         return 8
     else:

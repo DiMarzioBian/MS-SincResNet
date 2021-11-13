@@ -167,7 +167,7 @@ class SPP_Resnet(nn.Module):
 class xxMusic(nn.Module):
     def __init__(self, opt):
         super(xxMusic, self).__init__()
-        self.resnet_pretrained = opt.resnet_pretrained
+        self.resnet_pretrained = True
         self.enable_spp = opt.enable_spp
         self.num_label = opt.num_label
         self.loss_type = opt.loss_type

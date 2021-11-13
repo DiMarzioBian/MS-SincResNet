@@ -8,9 +8,10 @@ import os
 from tqdm import tqdm
 
 from xxMusic.Metrics import calc_voting_accuracy
+from Utils import set_optimizer_lr
 
 
-def train_epoch(model, data, opt, optimizer):
+def train_epoch(epoch, model, data, opt, optimizer):
     """
     Flow for each epoch
     """
@@ -18,25 +19,23 @@ def train_epoch(model, data, opt, optimizer):
     num_pred_correct_epoch = 0
     loss_epoch = 0
 
-    if opt.is_distributed:
-        model.module.train()
-    else:
-        model.train()
-
+    model.train()
     for batch in tqdm(data, desc='- (Training)   ', leave=False):
 
         optimizer.zero_grad()
-        if opt.is_distributed:
-            wave, y_gt = map(lambda x: x.to(opt.local_rank), batch)
-            loss_batch, num_pred_correct_batch = model.module.loss(wave, y_gt)
-        else:
-            wave, y_gt = map(lambda x: x.to(opt.device), batch)
-            loss_batch, num_pred_correct_batch = model.loss(wave, y_gt)
+        if opt.manual_lr & epoch > 5:
+            set_optimizer_lr(optimizer, 1e-5)
+        elif opt.manual_lr & epoch == 6:
+            set_optimizer_lr(optimizer, opt.lr)
 
+        wave, y_gt = map(lambda x: x.to(opt.device), batch)
+        loss_batch, num_pred_correct_batch = model.loss(wave, y_gt)
         loss_batch.backward()
-        optimizer.step()
 
-        num_pred_correct_epoch += num_pred_correct_batch * batch[1].shape[0]
+        if (not opt.manual_lr) & (opt.manual_lr & epoch > 5):
+            optimizer.step()
+
+        num_pred_correct_epoch += num_pred_correct_batch
         loss_epoch += loss_batch * batch[1].shape[0]
 
     return loss_epoch / num_data, num_pred_correct_epoch / num_data
@@ -51,12 +50,8 @@ def test_epoch(model, data, gt_voting, opt, dataset):
     loss_epoch = 0
     i = 0
 
-    if opt.is_distributed:
-        y_pred_epoch = (torch.ones(data.dataset.length) * (-1)).to(opt.local_rank)
-        model.module.eval()
-    else:
-        y_pred_epoch = (torch.ones(data.dataset.length) * (-1)).to(opt.device)
-        model.eval()
+    y_pred_epoch = (torch.ones(data.dataset.length) * (-1)).to(opt.device)
+    model.eval()
 
     for batch in tqdm(data, desc='- (Testing)   ', leave=False):
 

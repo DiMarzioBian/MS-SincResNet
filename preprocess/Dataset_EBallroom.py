@@ -7,7 +7,6 @@ from torch.utils.data import Dataset, DataLoader
 import torchaudio
 import argparse
 
-
 mapper_genre = {
     "chacha": 0,
     "jive": 1,
@@ -18,6 +17,10 @@ mapper_genre = {
     "viennesewaltz": 6,
     "waltz": 7,
     "foxtrot": 8,
+    "pasodoble": 9,
+    "salsa": 10,
+    "slowwaltz": 11,
+    "wcswing": 12,
 }
 
 
@@ -47,9 +50,10 @@ class EBallroom_3s(Dataset):
                  hop_gap: float = 0.5,
                  sample_splits_per_track: int = 100,
                  augment: bool = False,
-                 root: str = '_data/EBallroom/',):
+                 root: str = '_data/EBallroom/',
+                 enable_data_filtered: bool = False):
         """
-        Instancelize extended ballroom, indexing clips by enlarged indices and map label to integers.
+        Instancelize GTZAN, indexing clips by enlarged indices and map label to integers.
         """
         self._walker = list_filename
 
@@ -61,12 +65,9 @@ class EBallroom_3s(Dataset):
         self.sample_splits_per_track = sample_splits_per_track
         self.augment = augment
 
-        self.num_label = len(mapper_genre)
-        self.total_num_splits = int(30.5 // (3+hop_gap))
+        self.num_label = 9 if enable_data_filtered else 13
+        self.total_num_splits = int(30.5 // (3 + hop_gap))
         self._ext_audio = ".mp3"
-
-        # Discard cateogries: , 'Pasodoble', 'Salsa', Slowwaltz', 'Wcswing' to keep datset updpeedm
-        self.label = ['chacha', 'jive', 'quickstep', 'rumba', 'samba', 'tango', 'viennesewaltz', 'waltz', 'foxtrot']
 
         self.length = len(self._walker) * self.sample_splits_per_track
 
@@ -87,8 +88,8 @@ class EBallroom_3s(Dataset):
         wave, sr, genre_str = load_EBallroom_item(self._walker[index_full], self.root, ".mp3")
         wave = signal.resample(wave.mean(0).detach().numpy(), self.new_sr * 30)
 
-        start = int((3+self.hop_gap) * index_split * self.new_sr)
-        end = int(start + 3*self.new_sr)
+        start = int((3 + self.hop_gap) * index_split * self.new_sr)
+        end = int(start + 3 * self.new_sr)
         wave = torch.from_numpy(wave[start: end]).float().unsqueeze_(dim=0)
 
         # augmentation
@@ -113,7 +114,8 @@ def get_EBallroom_dataloader(opt: argparse.Namespace, train_list: list, val_list
 
     # Instancelize dataset
     train_data = EBallroom_3s(list_filename=train_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
-                              hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=True)
+                              hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track,
+                              augment=True, enable_data_filtered=opt.enable_data_filtered)
 
     val_data = EBallroom_3s(list_filename=val_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
                             hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=False)

@@ -27,6 +27,15 @@ def data_downloader(dataset):
                 "\nError loading EBallroom. Please run script 'getEBallroom.py.py' to download......\n"
             )
 
+    elif dataset == 'FMA_small':
+        filename = '_data/FMA_small/fma_small/000/000002.mp3'
+        if os.path.exists(filename):
+            print('\nFMA_small dataset downloaded.......\n')
+        else:
+            raise RuntimeError(
+                "\nError loading FMA_small. Please see README.md......\n"
+            )
+
     else:
         raise RuntimeError("\nDataset "+dataset+" not found......\n")
 
