@@ -23,7 +23,7 @@ def train_epoch(epoch, model, data, opt, optimizer):
     for batch in tqdm(data, desc='- (Training)   ', leave=False):
 
         optimizer.zero_grad()
-        if opt.manual_lr & epoch > 5:
+        if opt.manual_lr & epoch <= 5:
             set_optimizer_lr(optimizer, 1e-5)
         elif opt.manual_lr & epoch == 6:
             set_optimizer_lr(optimizer, opt.lr)

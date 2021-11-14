@@ -8,11 +8,11 @@ filename_list = []
 discard_list = ['098565.mp3', '098567.mp3', '098569.mp3', '099134.mp3', '108925.mp3', '133297.mp3']
 
 # Unzipping
-print('Unzipping FMA_small.zip')
-# zip_file = zipfile.ZipFile('FMA_small.zip')
-# for name in zip_file.namelist():
-#     zip_file.extract(name)
-# zip_file.close()
+print('Unzipping fma_small.zip')
+zip_file = zipfile.ZipFile('fma_small.zip')
+for name in zip_file.namelist():
+    zip_file.extract(name)
+zip_file.close()
 
 print('Unzipping fma_metadata.zip')
 zip_file = zipfile.ZipFile('fma_metadata.zip')

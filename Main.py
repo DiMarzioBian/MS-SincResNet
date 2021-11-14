@@ -32,8 +32,8 @@ def main():
     parser.add_argument('--es_patience', type=int, default=15)
     parser.add_argument('--gamma_steplr', type=float, default=np.sqrt(0.1))
     parser.add_argument('--epoch', type=int, default=200)
-    parser.add_argument('--num_workers', type=int, default=1)
-    parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument('--num_workers', type=int, default=10)
+    parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--is_distributed', type=bool, default=False)
 
     # Settings need to be tuned
@@ -134,7 +134,7 @@ def main():
                                 loss_val=loss_val, acc_val=acc_val, acc_val_voting=acc_val_voting), )
 
             """ Early stopping """
-            if (not opt.manual_lr) & (opt.manual_lr & epoch > 5):
+            if (not opt.manual_lr) or (opt.manual_lr & epoch <= 5):
                 if best_acc_voting < acc_val_voting or (best_acc_voting == acc_val_voting) & (best_loss >= loss_val):
                     best_acc = acc_val
                     best_loss = loss_val
