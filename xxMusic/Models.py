@@ -171,6 +171,7 @@ class xxMusic(nn.Module):
         self.enable_spp = opt.enable_spp
         self.num_label = opt.num_label
         self.loss_type = opt.loss_type
+        self.lambda_centerloss = opt.lambda_centerloss
 
         self.layerNorm = nn.LayerNorm([1, 3*opt.sample_rate])
         self.sincNet1 = nn.Sequential(
@@ -216,7 +217,7 @@ class xxMusic(nn.Module):
         loss = self.calc_loss(score_pred, y_gt)
         if self.loss_type == 'CenterLoss':
             loss2 = self.calc_loss2(score_pred, y_gt)
-            loss = loss + 1e-3*loss2
+            loss = loss + self.lambda_centerloss * loss2
         elif self.loss_type == 'TripletLoss':
             loss2 = self.calc_loss2(score_pred, y_gt)[0]
             loss = loss + loss2
@@ -229,12 +230,6 @@ class xxMusic(nn.Module):
         """ Predict data label and compute loss"""
         score_pred, *_ = self.forward(wave)
         loss = self.calc_loss(score_pred, y_gt)
-        if self.loss_type == 'CenterLoss':
-            loss2 = self.calc_loss2(score_pred, y_gt)
-            loss = loss + 1e-3 * loss2
-        elif self.loss_type == 'TripletLoss':
-            loss2 = self.calc_loss2(score_pred, y_gt)[0]
-            loss = loss + loss2
 
         _, y_pred = torch.max(score_pred, -1)
         num_correct_pred = y_pred.eq(y_gt).sum()

@@ -21,8 +21,6 @@ def train_epoch(model, data, opt, optimizer):
 
     model.train()
 
-    print('\n- Learning rate is: ', str(optimizer.param_groups[0]['lr']))
-
     for batch in tqdm(data, desc='- (Training)   ', leave=False):
         wave, y_gt = map(lambda x: x.to(opt.device), batch)
         loss_batch, num_pred_correct_batch = model.loss(wave, y_gt)

@@ -32,19 +32,20 @@ def main():
     parser.add_argument('--es_patience', type=int, default=15)
     parser.add_argument('--gamma_steplr', type=float, default=np.sqrt(0.1))
     parser.add_argument('--epoch', type=int, default=200)
-    parser.add_argument('--num_workers', type=int, default=14)
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--num_workers', type=int, default=1)
+    parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--is_distributed', type=bool, default=False)
 
     # Settings need to be tuned
     parser.add_argument('--data', default='GTZAN')
     parser.add_argument('--enable_data_filtered', type=bool, default=False)  # Enable data filtering
-    parser.add_argument('--lr', type=float, default=1e-3)
-    parser.add_argument('--manual_lr', type=bool, default=True)  # Will override other lr
+    parser.add_argument('--lr', type=float, default=1e-2)
+    parser.add_argument('--manual_lr', type=bool, default=False)  # Will override other lr
     parser.add_argument('--manual_lr_epoch', type=int, default=5)
     parser.add_argument('--enable_spp', type=bool, default=False)  # Enable SPP instead of ResNet fc layer directly
-    parser.add_argument('--loss_type', type=str, default='None')  # CenterLoss or TripletLoss, else will disable
+    parser.add_argument('--loss_type', type=str, default='TripletLoss')  # CenterLoss or TripletLoss, else will disable
     parser.add_argument('--triplet_margin', default=0.1)  # If TripletLoss is chosen as loss type
+    parser.add_argument('--lambda_centerloss', default=1e-2)  # Lambda for CenterLoss
 
     opt = parser.parse_args()
     opt.log = '_result/log/v' + opt.version + time.strftime("-%b_%d_%H_%M", time.localtime()) + '.txt'
@@ -114,8 +115,6 @@ def main():
                 set_optimizer_lr(optimizer, 5e-3)
             elif opt.manual_lr and (epoch - opt.manual_lr_epoch) % 30 == 0:
                 update_optimizer_lr(optimizer)
-
-            print('\nManual lr: {x}'.format(x=opt.manual_lr))
 
             loss_train, acc_train = train_epoch(model, trainloader, opt, optimizer)
 
