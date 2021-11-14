@@ -12,15 +12,14 @@ import torchaudio
 track_dict = pickle.load(open('_data/FMA_small/track_genre.pkl', 'rb'))
 
 
-def load_FMA_small_item(filename: str, path: str, ext_audio: str = ".mp3") -> Tuple[torch.Tensor, int, str]:
+def load_FMA_small_item(filename: str, path: str) -> Tuple[torch.Tensor, int, str]:
     """
     Loads a file from the dataset and returns the raw waveform
     as a Torch Tensor, its sample rate as an integer, and its
     genre as a string.
     """
     # Read wav
-    file_audio = os.path.join(path, filename)
-    waveform, sample_rate = torchaudio.load(file_audio)
+    waveform, sample_rate = torchaudio.load(path + filename)
 
     return waveform, sample_rate, track_dict[filename]
 
@@ -35,7 +34,7 @@ class FMA_small_3s(Dataset):
                  hop_gap: float = 0.5,
                  sample_splits_per_track: int = 100,
                  augment: bool = False,
-                 root: str = '_data/FMA_small/fma_small',):
+                 root: str = '_data/FMA_small/fma_small/',):
         """
         Instancelize FMA small, indexing clips by enlarged indices and map label to integers.
         """
@@ -71,7 +70,7 @@ class FMA_small_3s(Dataset):
         index_full, index_table_split = divmod(index, self.sample_splits_per_track)
         index_split = self.table_random[index_full][index_table_split]
 
-        wave, sr, genre_str = load_FMA_small_item(self._walker[index_full], self.root, ".mp3")
+        wave, sr, genre_str = load_FMA_small_item(self._walker[index_full], self.root)
         wave = signal.resample(wave.mean(0).detach().numpy(), self.new_sr * 30)
 
         start = int((3+self.hop_gap) * index_split * self.new_sr)

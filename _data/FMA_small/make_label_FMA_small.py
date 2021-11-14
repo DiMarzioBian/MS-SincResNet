@@ -27,7 +27,7 @@ for dir_name, _, file_list in os.walk('fma_small'):
         if track_name in discard_list:
             continue
         track_list.append(int(track_name[:-4]))
-        filename_list.append(os.path.join(dir_name[-3:], track_name))
+        filename_list.append(dir_name[-3:] + '/' + track_name)
 
 # Discard unused columns and rows
 df_track_full = pd.read_csv('fma_metadata/tracks.csv', skiprows=[0])
