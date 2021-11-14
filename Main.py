@@ -18,8 +18,8 @@ def main():
     Preparation
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--version', type=str, default='2.0')
-    parser.add_argument('--note', type=str, default='Finished all basic coding.')
+    parser.add_argument('--version', type=str, default='2.0.1')
+    parser.add_argument('--note', type=str, default='Add centerloss lambda support.')
 
     parser.add_argument('--download', default=True)  # Download dataset
     parser.add_argument('--sample_rate', type=int, default=16000)
