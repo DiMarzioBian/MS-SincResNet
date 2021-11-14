@@ -5,7 +5,8 @@ import zipfile
 
 track_list = []
 filename_list = []
-discard_list = ['098565.mp3', '098567.mp3', '098569.mp3', '099134.mp3', '108925.mp3', '133297.mp3']
+discard_list = ['098565.mp3', '098567.mp3', '098569.mp3', '099134.mp3', '108925.mp3', '133297.mp3',
+                'checksums', 'README.txt']
 
 # Unzipping
 print('Unzipping fma_small.zip')
@@ -51,3 +52,4 @@ for fn, x in zip(filename_list, df_track.iterrows()):
 file = open('track_genre.pkl', 'wb')
 pickle.dump(dict_genre, file)
 
+print('\n[info] Finished creating pkl file.\n')
