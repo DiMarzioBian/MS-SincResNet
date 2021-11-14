@@ -11,7 +11,7 @@ from xxMusic.Metrics import calc_voting_accuracy
 from Utils import set_optimizer_lr
 
 
-def train_epoch(epoch, model, data, opt, optimizer):
+def train_epoch(model, data, opt, optimizer):
     """
     Flow for each epoch
     """
@@ -20,20 +20,15 @@ def train_epoch(epoch, model, data, opt, optimizer):
     loss_epoch = 0
 
     model.train()
+
+    print('\n- Learning rate is: ', str(optimizer.param_groups[0]['lr']))
+
     for batch in tqdm(data, desc='- (Training)   ', leave=False):
-
-        optimizer.zero_grad()
-        if opt.manual_lr & epoch <= 5:
-            set_optimizer_lr(optimizer, 1e-5)
-        elif opt.manual_lr & epoch == 6:
-            set_optimizer_lr(optimizer, opt.lr)
-
         wave, y_gt = map(lambda x: x.to(opt.device), batch)
         loss_batch, num_pred_correct_batch = model.loss(wave, y_gt)
         loss_batch.backward()
-
-        if (not opt.manual_lr) & (opt.manual_lr & epoch > 5):
-            optimizer.step()
+        optimizer.step()
+        optimizer.zero_grad()
 
         num_pred_correct_epoch += num_pred_correct_batch
         loss_epoch += loss_batch * batch[1].shape[0]
@@ -64,7 +59,7 @@ def test_epoch(model, data, gt_voting, opt, dataset):
 
         num_pred_correct_epoch += num_pred_correct_batch
         loss_epoch += loss_batch * batch[1].shape[0]
-        y_pred_epoch[i*data.batch_size: (i+1)*data.batch_size] = y_pred_batch
+        y_pred_epoch[i * data.batch_size: (i + 1) * data.batch_size] = y_pred_batch
         i += 1
 
     # Voting accuracy

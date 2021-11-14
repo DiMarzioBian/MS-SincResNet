@@ -10,7 +10,7 @@ import torch.optim as optim
 
 from preprocess.Dataset import getter_dataloader, get_num_label
 from Epoch import train_epoch, test_epoch
-from Utils import data_downloader
+from Utils import data_downloader, set_optimizer_lr, update_optimizer_lr
 
 
 def main():
@@ -32,15 +32,16 @@ def main():
     parser.add_argument('--es_patience', type=int, default=15)
     parser.add_argument('--gamma_steplr', type=float, default=np.sqrt(0.1))
     parser.add_argument('--epoch', type=int, default=200)
-    parser.add_argument('--num_workers', type=int, default=10)
+    parser.add_argument('--num_workers', type=int, default=14)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--is_distributed', type=bool, default=False)
 
     # Settings need to be tuned
-    parser.add_argument('--data', default='FMA_small')
+    parser.add_argument('--data', default='GTZAN')
     parser.add_argument('--enable_data_filtered', type=bool, default=False)  # Enable data filtering
     parser.add_argument('--lr', type=float, default=1e-3)
-    parser.add_argument('--manual_lr', type=bool, default=False)  # Will override other lr
+    parser.add_argument('--manual_lr', type=bool, default=True)  # Will override other lr
+    parser.add_argument('--manual_lr_epoch', type=int, default=5)
     parser.add_argument('--enable_spp', type=bool, default=False)  # Enable SPP instead of ResNet fc layer directly
     parser.add_argument('--loss_type', type=str, default='None')  # CenterLoss or TripletLoss, else will disable
     parser.add_argument('--triplet_margin', default=0.1)  # If TripletLoss is chosen as loss type
@@ -48,11 +49,6 @@ def main():
     opt = parser.parse_args()
     opt.log = '_result/log/v' + opt.version + time.strftime("-%b_%d_%H_%M", time.localtime()) + '.txt'
     opt.device = torch.device('cuda')
-
-    if opt.manual_lr:
-        opt.lr = 0.05
-        opt.lr_patience = 30
-        opt.gamma_steplr = 0.5
 
     # Download dataset
     if opt.download:
@@ -90,7 +86,8 @@ def main():
         model = xxMusic(opt).to(opt.device)
         optimizer = optim.SGD(filter(lambda x: x.requires_grad, model.parameters()), lr=opt.lr, momentum=0.9,
                               weight_decay=opt.l2_reg, nesterov=True)
-        scheduler = optim.lr_scheduler.StepLR(optimizer, int(opt.lr_patience), gamma=opt.gamma_steplr)
+        if not opt.manual_lr:
+            scheduler = optim.lr_scheduler.StepLR(optimizer, int(opt.lr_patience), gamma=opt.gamma_steplr)
 
         # Load data
         print('\n[Info] Loading data...')
@@ -110,8 +107,19 @@ def main():
             start = time.time()
 
             trainloader.dataset.shuffle()
-            loss_train, acc_train = train_epoch(epoch, model, trainloader, opt, optimizer)
-            if (not opt.manual_lr) & (opt.manual_lr & epoch > 5):
+
+            if opt.manual_lr and epoch <= opt.manual_lr_epoch:
+                set_optimizer_lr(optimizer, 1e-5)
+            elif opt.manual_lr and epoch == (opt.manual_lr_epoch + 1):
+                set_optimizer_lr(optimizer, 5e-3)
+            elif opt.manual_lr and (epoch - opt.manual_lr_epoch) % 30 == 0:
+                update_optimizer_lr(optimizer)
+
+            print('\nManual lr: {x}'.format(x=opt.manual_lr))
+
+            loss_train, acc_train = train_epoch(model, trainloader, opt, optimizer)
+
+            if not opt.manual_lr:
                 scheduler.step()
 
             end = time.time()
@@ -134,7 +142,7 @@ def main():
                                 loss_val=loss_val, acc_val=acc_val, acc_val_voting=acc_val_voting), )
 
             """ Early stopping """
-            if (not opt.manual_lr) or (opt.manual_lr & epoch <= 5):
+            if epoch > opt.manual_lr_epoch:
                 if best_acc_voting < acc_val_voting or (best_acc_voting == acc_val_voting) & (best_loss >= loss_val):
                     best_acc = acc_val
                     best_loss = loss_val
@@ -178,6 +186,7 @@ def main():
           'average voting accuracy: {voting: 8.4f}\n'
           .format(loss=np.mean(cv_loss), acc=np.mean(cv_acc), voting=np.mean(cv_acc_voting)), )
     print('\n------------------------ Finished. ------------------------\n')
+
 
 # def test(opt, model, data_getter):
 #     print('\n[ Epoch testing ]')
