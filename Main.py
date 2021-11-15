@@ -17,7 +17,7 @@ from Utils import adjust_learning_rate
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-version', type=str, default='1.3.1')
+    parser.add_argument('-version', type=str, default='1.7.1')
     parser.add_argument('-note', type=str, default='Set manual lr follow paper.')
     parser.add_argument('-load_state', default=False)  # Provide state_dict path for testing or continue training
     parser.add_argument('-save_state', default=False)  # Saving best or latest model state_dict
@@ -45,6 +45,10 @@ def main():
     parser.add_argument('-es_patience', type=int, default=15)
     parser.add_argument('-gamma_steplr', type=float, default=np.sqrt(0.1))
 
+    parser.add_argument('-time_stretch_factor', type=float, default=1.0) # set less than 1.0 to enable time stretch
+    parser.add_argument('-pitch_shift_steps', type=float, default = 0.0) # set not equal to 0 to enable pitch shift
+    parser.add_argument('-augment_probability', type=float, default=0.5)
+
     parser.add_argument('-resnet_pretrained', default=True)
     # parser.add_argument('-resnet_freeze', default=False)
 
@@ -62,6 +66,10 @@ def main():
     print('\n[Info] Model settings:\n')
     for k, v in vars(opt).items():
         print('         %s: %s' % (k, v))
+
+    if opt.time_stretch_factor > 1.0:
+        print("WARNING! Currently only time stretch < 1.0 is supported. Disabling time stretch...")
+        opt.time_stretch_factor = 1.0
 
     # Download dataset
     if opt.download:
