@@ -18,8 +18,9 @@ def main():
     Preparation
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--version', type=str, default='2.0.1')
-    parser.add_argument('--note', type=str, default='Add centerloss lambda support.')
+    parser.add_argument('--version', type=str, default='2.1.0')
+    parser.add_argument('--note', type=str, default='Add time stretch and pitch shift support.')
+
 
     parser.add_argument('--download', default=True)  # Download dataset
     parser.add_argument('--sample_rate', type=int, default=16000)
@@ -47,6 +48,10 @@ def main():
     parser.add_argument('--triplet_margin', default=0.1)  # If TripletLoss is chosen as loss type
     parser.add_argument('--lambda_centerloss', default=1e-2)  # Lambda for CenterLoss
 
+    parser.add_argument('--time_stretch_factor', type=float, default=1.0)  # set less than 1.0 to enable time stretch
+    parser.add_argument('--pitch_shift_steps', type=float, default=0.0)  # set not equal to 0 to enable pitch shift
+    parser.add_argument('--augment_probability', type=float, default=0.5)
+
     opt = parser.parse_args()
     opt.log = '_result/log/v' + opt.version + time.strftime("-%b_%d_%H_%M", time.localtime()) + '.txt'
     opt.device = torch.device('cuda')
@@ -59,6 +64,10 @@ def main():
     print('\n[Info] Model settings:\n')
     for k, v in vars(opt).items():
         print('         %s: %s' % (k, v))
+
+    if opt.time_stretch_factor > 1.0:
+        print("WARNING! Currently only time stretch < 1.0 is supported. Disabling time stretch...")
+        opt.time_stretch_factor = 1.0
 
     with open(opt.log, 'a') as f:
         # Save hyperparameters
