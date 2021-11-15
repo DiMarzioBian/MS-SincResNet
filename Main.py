@@ -48,9 +48,9 @@ def main():
     parser.add_argument('--triplet_margin', default=0.1)  # If TripletLoss is chosen as loss type
     parser.add_argument('--lambda_centerloss', default=1e-2)  # Lambda for CenterLoss
 
-    parser.add_argument('-time_stretch_factor', type=float, default=1.0)  # set less than 1.0 to enable time stretch
-    parser.add_argument('-pitch_shift_steps', type=float, default=0.0)  # set not equal to 0 to enable pitch shift
-    parser.add_argument('-augment_probability', type=float, default=0.5)
+    parser.add_argument('--time_stretch_factor', type=float, default=1.0)  # set less than 1.0 to enable time stretch
+    parser.add_argument('--pitch_shift_steps', type=float, default=0.0)  # set not equal to 0 to enable pitch shift
+    parser.add_argument('--augment_probability', type=float, default=0.5)
 
     opt = parser.parse_args()
     opt.log = '_result/log/v' + opt.version + time.strftime("-%b_%d_%H_%M", time.localtime()) + '.txt'
