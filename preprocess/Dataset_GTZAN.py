@@ -1,12 +1,14 @@
 import os
 from typing import Tuple
+import argparse
+import numpy as np
 import random
 
 from scipy import signal
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torchaudio
-import argparse
+from librosa.effects import pitch_shift, time_stretch
 
 
 mapper_genre = {
@@ -49,6 +51,9 @@ class GTZAN_3s(Dataset):
                  hop_gap: float = 0.5,
                  sample_splits_per_track: int = 100,
                  augment: bool = False,
+                 prob_augment: float = 0.5,
+                 time_stretch_factor: float = 1.0,
+                 pitch_shift_steps: float = 0.0,
                  root: str = '_data/GTZAN/',):
         """
         Instancelize GTZAN, indexing clips by enlarged indices and map label to integers.
@@ -62,6 +67,10 @@ class GTZAN_3s(Dataset):
         self.hop_gap = hop_gap
         self.sample_splits_per_track = sample_splits_per_track
         self.augment = augment
+
+        self.prob_augment = prob_augment
+        self.time_stretch_factor = time_stretch_factor
+        self.pitch_shift_steps = pitch_shift_steps
 
         self.num_label = len(mapper_genre)
         self.total_num_splits = int(30.5 // (3+hop_gap))
@@ -95,12 +104,27 @@ class GTZAN_3s(Dataset):
 
         start = int((3+self.hop_gap) * index_split * self.new_sr)
         end = int(start + 3*self.new_sr)
-        wave = torch.from_numpy(wave[start: end]).float().unsqueeze_(dim=0)
+        wave = wave[start: end]
 
-        # augmentation
+        # Implement time stretching, pitch shifting and default noise adding
         if self.augment:
-            wave *= torch.rand(1) * 0.2 + 0.9
-            wave += torch.randn(wave.size()) * self.sigma_gnoise
+            if self.pitch_shift_steps != 0:
+                if np.random.rand() <= self.prob_augment:
+                    x = np.random.rand() * self.pitch_shift_steps * 2 - self.pitch_shift_steps
+                    if x >= 0.0:
+                        wave = pitch_shift(wave, self.new_sr, np.ceil(x))
+                    else:
+                        wave = pitch_shift(wave, self.new_sr, np.floor(x))
+
+            if self.time_stretch_factor < 1.0:
+                if np.random.rand() <= self.prob_augment:
+                    wave = time_stretch(wave, np.random.rand()*(1-self.time_stretch_factor) + self.time_stretch_factor)
+                    wave = wave[:self.new_sr * 3]  # take only the first 3 seconds of the time stretched clip
+
+        wave *= np.random.rand() * 0.2 + 0.9
+        wave += np.random.randn(len(wave)) * self.sigma_gnoise
+        wave = torch.from_numpy(wave).float().unsqueeze_(dim=0)
+
         return wave, mapper_genre[genre_str]
 
     def shuffle(self):
@@ -113,13 +137,14 @@ def get_GTZAN_dataloader(opt: argparse.Namespace, train_list: list, val_list: li
 
     # Calculate how many 3s clips could be extracted from a 30s track as available maximum of 3s clips
     # opt.sample_splits_per_track is the needed number of samples which must not be greater than maximum of 3s clips
+    augment = opt.augment
     opt.total_num_splits = int(30.5 // (3 + opt.hop_gap))
     if opt.sample_splits_per_track > opt.total_num_splits:
         opt.sample_splits_per_track = opt.total_num_splits
 
     # Instancelize dataset
     train_data = GTZAN_3s(list_filename=train_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
-                          hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=True)
+                          hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=augment)
 
     val_data = GTZAN_3s(list_filename=val_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
                         hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=False)

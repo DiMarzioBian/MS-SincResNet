@@ -193,7 +193,7 @@ class xxMusic(nn.Module):
 
         self.calc_loss = LabelSmoothingLoss(opt.smooth_label, opt.num_label)
         if self.loss_type == 'CenterLoss':
-            self.calc_loss2 = CenterLoss(num_classes=opt.num_label, feat_dim=10, use_gpu=True)
+            self.calc_loss2 = CenterLoss(num_classes=opt.num_label, feat_dim=10, device=opt.device)
         elif self.loss_type == 'TripletLoss':
             self.calc_loss2 = TripletLoss(margin=opt.triplet_margin, p=2., mining_type='all')
 

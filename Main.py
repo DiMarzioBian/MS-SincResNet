@@ -18,9 +18,10 @@ def main():
     Preparation
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--version', type=str, default='2.0.1')
-    parser.add_argument('--note', type=str, default='Add centerloss lambda support.')
+    parser.add_argument('--version', type=str, default='2.1')
+    parser.add_argument('--note', type=str, default='Add pitch shift and time stretch.')
 
+    parser.add_argument('--is_distributed', type=bool, default=False)
     parser.add_argument('--download', default=True)  # Download dataset
     parser.add_argument('--sample_rate', type=int, default=16000)
     parser.add_argument('--hop_gap', type=float, default=0.5)  # time gap between each adjacent splits in a track
@@ -32,24 +33,29 @@ def main():
     parser.add_argument('--es_patience', type=int, default=15)
     parser.add_argument('--gamma_steplr', type=float, default=np.sqrt(0.1))
     parser.add_argument('--epoch', type=int, default=200)
-    parser.add_argument('--num_workers', type=int, default=1)
-    parser.add_argument('--batch_size', type=int, default=2)
-    parser.add_argument('--is_distributed', type=bool, default=False)
-
-    # Settings need to be tuned
-    parser.add_argument('--data', default='GTZAN')
-    parser.add_argument('--enable_data_filtered', type=bool, default=False)  # Enable data filtering
     parser.add_argument('--lr', type=float, default=1e-2)
     parser.add_argument('--manual_lr', type=bool, default=False)  # Will override other lr
     parser.add_argument('--manual_lr_epoch', type=int, default=5)
-    parser.add_argument('--enable_spp', type=bool, default=False)  # Enable SPP instead of ResNet fc layer directly
-    parser.add_argument('--loss_type', type=str, default='TripletLoss')  # CenterLoss or TripletLoss, else will disable
+    parser.add_argument('--enable_spp', type=bool, default=True)  # Enable SPP instead of ResNet fc layer directly
+    parser.add_argument('--enable_data_filtered', type=bool, default=False)  # Enable data filtering
+    parser.add_argument('--num_workers', type=int, default=16)
+    parser.add_argument('--batch_size', type=int, default=8)
+
+    # Settings need to be tuned
+    parser.add_argument('--data', default='GTZAN')
+    parser.add_argument('--loss_type', type=str, default='None')  # CenterLoss or TripletLoss, else will disable
     parser.add_argument('--triplet_margin', default=0.1)  # If TripletLoss is chosen as loss type
     parser.add_argument('--lambda_centerloss', default=1e-2)  # Lambda for CenterLoss
+
+    parser.add_argument('--augment', type=bool, default=True)
+    parser.add_argument('--prob_augment', type=float, default=0.5)  # Probability to augment data
+    parser.add_argument('--pitch_shift_steps', type=int, default=1)  # set not equal to 0 to enable pitch shift
+    parser.add_argument('--time_stretch_factor', type=float, default=1)  # set less than 1.0 to enable time stretch
 
     opt = parser.parse_args()
     opt.log = '_result/log/v' + opt.version + time.strftime("-%b_%d_%H_%M", time.localtime()) + '.txt'
     opt.device = torch.device('cuda')
+    torch.backends.cudnn.benchmark = True
 
     # Download dataset
     if opt.download:
