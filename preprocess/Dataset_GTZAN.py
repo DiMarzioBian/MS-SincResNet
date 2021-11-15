@@ -1,5 +1,5 @@
 import os
-from typing import Tuple, Optional, Union
+from typing import Tuple
 import random
 
 from scipy import signal
@@ -10,6 +10,7 @@ import argparse
 import numpy as np
 from torchaudio import transforms
 from pyrubberband.pyrb import pitch_shift
+
 
 mapper_genre = {
     "blues": 0,
@@ -168,19 +169,23 @@ def get_GTZAN_dataloader(opt: argparse.Namespace, train_list: list, val_list: li
     val_data = GTZAN_3s(list_filename=val_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
                         hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=False)
 
-    # Instancelize dataloader
-    train_loader = DataLoader(train_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=True)
-    val_loader = DataLoader(val_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=False)
+    if opt.is_distributed:
+        # Instancelize sampler
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_data)
+
+        # Instancelize dataloader
+        train_loader = DataLoader(train_data, batch_size=opt.batch_size, num_workers=opt.num_workers,
+                                  sampler=train_sampler)
+        val_loader = DataLoader(val_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=False)
+
+    else:
+        # Instancelize dataloader
+        train_loader = DataLoader(train_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=True)
+        val_loader = DataLoader(val_data, batch_size=opt.batch_size, num_workers=opt.num_workers, shuffle=False)
 
     return train_loader, val_loader
-#
-#
-# def get_GTZAN_filename():
-#     """ Return filtered_all filename """
-#     return filtered_all
 
 
 def get_GTZAN_labels(list_filename: list):
     """ Return filtered_all file genre """
     return torch.IntTensor([mapper_genre[s[:-6]] for s in list_filename])
-

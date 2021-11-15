@@ -7,6 +7,8 @@ import torch.nn.functional as F
 import torchvision.models as models
 
 from xxMusic.Metrics import LabelSmoothingLoss
+from xxMusic.center_loss import CenterLoss
+from xxMusic.triplet_loss import TripletLoss
 
 
 class SincConv_fast(nn.Module):
@@ -141,7 +143,7 @@ class SpatialPyramidPool2D(nn.Module):
 
 
 class SPP_Resnet(nn.Module):
-    def __init__(self, pretrained=True, enable_spp=True):
+    def __init__(self, num_label, pretrained=True, enable_spp=True):
         super(SPP_Resnet, self).__init__()
 
         if enable_spp:
@@ -151,11 +153,11 @@ class SPP_Resnet(nn.Module):
                 arch[-3:-2][0][0],
                 nn.Sequential(*list(arch[-3:-2][0][1].children())[:-1]),
                 SpatialPyramidPool2D(),
-                nn.Linear(2560, 10, bias=True)
+                nn.Linear(2560, num_label, bias=True)
             )
         else:
             self.model = models.resnet18(pretrained=pretrained)
-            self.model.fc = nn.Linear(512, 10, bias=True)
+            self.model.fc = nn.Linear(512, num_label, bias=True)
 
     def forward(self, x):
         x = self.model(x)
@@ -165,8 +167,11 @@ class SPP_Resnet(nn.Module):
 class xxMusic(nn.Module):
     def __init__(self, opt):
         super(xxMusic, self).__init__()
-        self.resnet_pretrained = opt.resnet_pretrained
+        self.resnet_pretrained = True
         self.enable_spp = opt.enable_spp
+        self.num_label = opt.num_label
+        self.loss_type = opt.loss_type
+        self.lambda_centerloss = opt.lambda_centerloss
 
         self.layerNorm = nn.LayerNorm([1, 3*opt.sample_rate])
         self.sincNet1 = nn.Sequential(
@@ -184,9 +189,13 @@ class xxMusic(nn.Module):
             nn.BatchNorm1d(160),
             nn.ReLU(inplace=True),
             nn.AdaptiveAvgPool1d(1024))
-        self.spp_resnet = SPP_Resnet(pretrained=self.resnet_pretrained, enable_spp=self.enable_spp)
+        self.spp_resnet = SPP_Resnet(self.num_label, pretrained=self.resnet_pretrained, enable_spp=self.enable_spp)
 
         self.calc_loss = LabelSmoothingLoss(opt.smooth_label, opt.num_label)
+        if self.loss_type == 'CenterLoss':
+            self.calc_loss2 = CenterLoss(num_classes=opt.num_label, feat_dim=10, use_gpu=True)
+        elif self.loss_type == 'TripletLoss':
+            self.calc_loss2 = TripletLoss(margin=opt.triplet_margin, p=2., mining_type='all')
 
     def forward(self, x):
         """ Feature extraction """
@@ -206,15 +215,23 @@ class xxMusic(nn.Module):
         """ Compute loss """
         score_pred, *_ = self.forward(wave)
         loss = self.calc_loss(score_pred, y_gt)
+        if self.loss_type == 'CenterLoss':
+            loss2 = self.calc_loss2(score_pred, y_gt)
+            loss = loss + self.lambda_centerloss * loss2
+        elif self.loss_type == 'TripletLoss':
+            loss2 = self.calc_loss2(score_pred, y_gt)[0]
+            loss = loss + loss2
+
         _, y_pred = torch.max(score_pred, -1)
         num_correct_pred = y_pred.eq(y_gt).sum()
-        return loss, num_correct_pred
+        return loss.mean(), num_correct_pred
 
     def predict(self, wave, y_gt):
         """ Predict data label and compute loss"""
         score_pred, *_ = self.forward(wave)
         loss = self.calc_loss(score_pred, y_gt)
+
         _, y_pred = torch.max(score_pred, -1)
         num_correct_pred = y_pred.eq(y_gt).sum()
-        return loss, num_correct_pred, y_pred
+        return loss.mean(), num_correct_pred, y_pred
 
