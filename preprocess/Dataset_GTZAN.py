@@ -8,8 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 import torchaudio
 import argparse
 import numpy as np
-from torchaudio import transforms
-from pyrubberband.pyrb import pitch_shift
+from pyrubberband.pyrb import *
 
 
 mapper_genre = {
@@ -70,9 +69,6 @@ class GTZAN_3s(Dataset):
         #Time stretch augmentation trial
         self.time_stretch_factor = time_stretch_factor
         self.augment_probability = augment_probability
-        self.spectrogram = transforms.Spectrogram(return_complex=True, power=None)
-        self.inverse_spectrogram = transforms.InverseSpectrogram()
-        self.stretch = transforms.TimeStretch()
 
         #pitch shift augmentation
         self.pitch_shift_steps = pitch_shift_steps
@@ -115,21 +111,20 @@ class GTZAN_3s(Dataset):
         wave, sr, genre_str = load_gtzan_item(self._walker[index_full], self._path, self._ext_audio)
         wave = signal.resample(wave.squeeze(0).detach().numpy(), self.new_sr * 30)
 
+        start = int((3 + self.hop_gap) * index_split * self.new_sr)
+        end = int(start + 3*self.new_sr)
+        wave = wave[start: end]
+
         # pitch shift if augment is enabled and if pitch shift steps is not zero and current clip is in the random list
         if self.augment and self.pitch_shift_steps != 0 and index_full in self.list_random_augment:
             wave = pitch_shift(wave, self.new_sr, self.pitch_shift_steps)
 
-        wave = torch.from_numpy(wave).float()
-
         # time stretch if augment is enabled and factor is less than 1 and the current clip is in the random list
         if self.augment and self.time_stretch_factor < 1.0 and index_full in self.list_random_augment:
-            wave = self.time_stretch(wave)
+            wave = time_stretch(wave,self.new_sr,self.time_stretch_factor)
+            wave = wave[:self.new_sr*3]  # take only the first 3 seconds of the time stretched clip
 
-
-
-        start = int((3+self.hop_gap) * index_split * self.new_sr)
-        end = int(start + 3*self.new_sr)
-        wave = wave[start: end].unsqueeze_(dim=0)
+        wave = torch.from_numpy(wave).float().unsqueeze_(dim=0)
 
         # amplitude and gnoise augmentation for all training set data
         if self.augment:
@@ -143,12 +138,6 @@ class GTZAN_3s(Dataset):
                                                  int(np.floor(len(self._walker) * self.augment_probability)))
         for i in range(len(self._walker)):
             self.table_random[i] = random.sample(range(self.total_num_splits), self.sample_splits_per_track)
-
-    def time_stretch(self, wave):
-        wave = self.spectrogram(wave)
-        wave = self.stretch(wave, self.time_stretch_factor)
-        wave = self.inverse_spectrogram(wave, int(self.new_sr * 30 * (1 / self.time_stretch_factor)))
-        return wave
 
 
 def get_GTZAN_dataloader(opt: argparse.Namespace, train_list: list, val_list: list):
