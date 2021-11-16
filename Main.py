@@ -40,7 +40,7 @@ def main():
     parser.add_argument('--num_workers', type=int, default=16)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--prob_augment', type=float, default=0.5)  # Probability to augment data
-    parser.add_argument('--num_cv', type=float, default=0.5)  # Probability to augment data
+    parser.add_argument('--num_cv', type=int, default=1)  # Probability to augment data
 
     # Settings need to be tuned
     parser.add_argument('--data', default='GTZAN')
