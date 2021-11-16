@@ -47,14 +47,16 @@ class GTZAN_3s(Dataset):
     def __init__(self,
                  list_filename: list,
                  new_sr: int,
-                 sigma_gnoise: int = 0,
+                 root: str = '_data/GTZAN/',
                  hop_gap: float = 0.5,
                  sample_splits_per_track: int = 100,
-                 augment: bool = False,
                  prob_augment: float = 0.5,
-                 time_stretch_factor: float = 1.0,
-                 pitch_shift_steps: float = 0.0,
-                 root: str = '_data/GTZAN/',):
+
+                 augment_loudness: float = 0.0,
+                 augment_noise: float = 0.0,
+                 augment_pitch_shift: int = 0,
+                 augment_time_stretch: float = 1.0,
+                 ):
         """
         Instancelize GTZAN, indexing clips by enlarged indices and map label to integers.
         """
@@ -63,14 +65,14 @@ class GTZAN_3s(Dataset):
         self.root = root
         self.old_sr = 22050
         self.new_sr = new_sr  # 16000
-        self.sigma_gnoise = sigma_gnoise
         self.hop_gap = hop_gap
         self.sample_splits_per_track = sample_splits_per_track
-        self.augment = augment
-
         self.prob_augment = prob_augment
-        self.time_stretch_factor = time_stretch_factor
-        self.pitch_shift_steps = pitch_shift_steps
+
+        self.augment_loudness = augment_loudness
+        self.augment_noise = augment_noise
+        self.augment_pitch_shift = augment_pitch_shift
+        self.augment_time_stretch = augment_time_stretch
 
         self.num_label = len(mapper_genre)
         self.total_num_splits = int(30.5 // (3+hop_gap))
@@ -107,24 +109,26 @@ class GTZAN_3s(Dataset):
         wave = wave[start: end]
 
         # Implement time stretching, pitch shifting and default noise adding
-        if self.augment:
-            if self.pitch_shift_steps != 0:
-                if np.random.rand() <= self.prob_augment:
-                    x = np.random.rand() * self.pitch_shift_steps * 2 - self.pitch_shift_steps
-                    if x >= 0.0:
-                        wave = pitch_shift(wave, self.new_sr, np.ceil(x))
-                    else:
-                        wave = pitch_shift(wave, self.new_sr, np.floor(x))
+        if self.augment_pitch_shift != 0:
+            if np.random.rand() <= self.prob_augment:
+                x = np.random.rand() * self.augment_pitch_shift * 2 - self.augment_pitch_shift
+                if x >= 0.0:
+                    wave = pitch_shift(wave, self.new_sr, np.ceil(x))
+                else:
+                    wave = pitch_shift(wave, self.new_sr, np.floor(x))
 
-            if self.time_stretch_factor < 1.0:
-                if np.random.rand() <= self.prob_augment:
-                    wave = time_stretch(wave, np.random.rand()*(1-self.time_stretch_factor) + self.time_stretch_factor)
-                    wave = wave[:self.new_sr * 3]  # take only the first 3 seconds of the time stretched clip
+        if self.augment_time_stretch < 1.0:
+            if np.random.rand() <= self.prob_augment:
+                wave = time_stretch(wave, np.random.rand()*(1-self.augment_time_stretch) + self.augment_time_stretch)
+                wave = wave[:self.new_sr * 3]  # take only the first 3 seconds of the time stretched clip
 
-        wave *= np.random.rand() * 0.2 + 0.9
-        wave += np.random.randn(len(wave)) * self.sigma_gnoise
+        if self.augment_loudness != 0:
+            wave *= np.random.rand() * self.augment_loudness * 2 + 1 - self.augment_loudness
+
+        if self.augment_noise != 0.0:
+            wave += np.random.randn(len(wave)) * self.augment_noise
+
         wave = torch.from_numpy(wave).float().unsqueeze_(dim=0)
-
         return wave, mapper_genre[genre_str]
 
     def shuffle(self):
@@ -137,17 +141,30 @@ def get_GTZAN_dataloader(opt: argparse.Namespace, train_list: list, val_list: li
 
     # Calculate how many 3s clips could be extracted from a 30s track as available maximum of 3s clips
     # opt.sample_splits_per_track is the needed number of samples which must not be greater than maximum of 3s clips
-    augment = opt.augment
+    augment_loudness = opt.augment_loudness
+    augment_noise = opt.augment_noise
+    augment_pitch_shift = opt.augment_pitch_shift
+    augment_time_stretch = opt.augment_time_stretch
+
+    augment_loudness_test = opt.augment_loudness_test
+    augment_noise_test = opt.augment_noise_test
+    augment_pitch_shift_test = opt.augment_pitch_shift_test
+    augment_time_stretch_test = opt.augment_time_stretch_test
+
     opt.total_num_splits = int(30.5 // (3 + opt.hop_gap))
     if opt.sample_splits_per_track > opt.total_num_splits:
         opt.sample_splits_per_track = opt.total_num_splits
 
     # Instancelize dataset
-    train_data = GTZAN_3s(list_filename=train_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
-                          hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=augment)
+    train_data = GTZAN_3s(list_filename=train_list, new_sr=opt.sample_rate, hop_gap=opt.hop_gap,
+                          sample_splits_per_track=opt.sample_splits_per_track,
+                          augment_loudness=augment_loudness, augment_noise=augment_noise,
+                          augment_pitch_shift=augment_pitch_shift, augment_time_stretch=augment_time_stretch)
 
-    val_data = GTZAN_3s(list_filename=val_list, new_sr=opt.sample_rate, sigma_gnoise=opt.sigma_gnoise,
-                        hop_gap=opt.hop_gap, sample_splits_per_track=opt.sample_splits_per_track, augment=False)
+    val_data = GTZAN_3s(list_filename=val_list, new_sr=opt.sample_rate, hop_gap=opt.hop_gap,
+                        sample_splits_per_track=opt.sample_splits_per_track,
+                        augment_loudness=augment_loudness_test, augment_noise=augment_noise_test,
+                        augment_pitch_shift=augment_pitch_shift_test, augment_time_stretch=augment_time_stretch_test)
 
     if opt.is_distributed:
         # Instancelize sampler

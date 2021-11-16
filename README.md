@@ -3,7 +3,7 @@
 
 Link: https://dl.acm.org/doi/abs/10.1145/3460426.3463619
 
-### This is a replicate of MS-SincResNet
+### This is a pytorch replicate of MS-SincResNet
 
 Running on single GPU:
 ```bash

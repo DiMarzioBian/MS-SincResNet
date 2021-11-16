@@ -18,15 +18,14 @@ def main():
     Preparation
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--version', type=str, default='2.1')
-    parser.add_argument('--note', type=str, default='Add pitch shift and time stretch.')
+    parser.add_argument('--version', type=str, default='2.2')
+    parser.add_argument('--note', type=str, default='Full augmentation test.')
 
     parser.add_argument('--is_distributed', type=bool, default=False)
     parser.add_argument('--download', default=True)  # Download dataset
     parser.add_argument('--sample_rate', type=int, default=16000)
     parser.add_argument('--hop_gap', type=float, default=0.5)  # time gap between each adjacent splits in a track
     parser.add_argument('--sample_splits_per_track', type=int, default=4)  # Random sampling splits instead of using all
-    parser.add_argument('--sigma_gnoise', type=float, default=0.004)
     parser.add_argument('--smooth_label', type=float, default=0.3)
     parser.add_argument('--lr_patience', type=int, default=10)
     parser.add_argument('--l2_reg', type=float, default=1e-5)
@@ -40,17 +39,23 @@ def main():
     parser.add_argument('--enable_data_filtered', type=bool, default=False)  # Enable data filtering
     parser.add_argument('--num_workers', type=int, default=16)
     parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--prob_augment', type=float, default=0.5)  # Probability to augment data
 
     # Settings need to be tuned
     parser.add_argument('--data', default='GTZAN')
-    parser.add_argument('--loss_type', type=str, default='None')  # CenterLoss or TripletLoss, else will disable
-    parser.add_argument('--triplet_margin', default=0.1)  # If TripletLoss is chosen as loss type
-    parser.add_argument('--lambda_centerloss', default=1e-2)  # Lambda for CenterLoss
+    parser.add_argument('--loss_type', type=str, default='CenterLoss')  # CenterLoss or TripletLoss, else will disable
+    parser.add_argument('--TripletLoss_margin', default=0.1)  # If TripletLoss is chosen as loss type
+    parser.add_argument('--CenterLoss_lambda', default=1e-2)  # Lambda for CenterLoss
 
-    parser.add_argument('--augment', type=bool, default=True)
-    parser.add_argument('--prob_augment', type=float, default=0.5)  # Probability to augment data
-    parser.add_argument('--pitch_shift_steps', type=int, default=1)  # set not equal to 0 to enable pitch shift
-    parser.add_argument('--time_stretch_factor', type=float, default=1)  # set less than 1.0 to enable time stretch
+    parser.add_argument('--augment_loudness', type=float, default=0.0)  # 0.2 stands for ± 0.2 loudness amplitude
+    parser.add_argument('--augment_noise', type=float, default=0.0)  # 0.001 stands for ± 0.001 white Gaussian noise
+    parser.add_argument('--augment_pitch_shift', type=int, default=0.0)  # Pitch shifting, put 1 as ±1
+    parser.add_argument('--augment_time_stretch', type=float, default=1.0)  # stretch strength, original speed is 1.0
+
+    parser.add_argument('--augment_loudness_test', type=float, default=0.0)
+    parser.add_argument('--augment_noise_test', type=float, default=0.0)
+    parser.add_argument('--augment_pitch_shift_test', type=int, default=0.0)
+    parser.add_argument('--augment_time_stretch_test', type=float, default=1.0)
 
     opt = parser.parse_args()
     opt.log = '_result/log/v' + opt.version + time.strftime("-%b_%d_%H_%M", time.localtime()) + '.txt'
