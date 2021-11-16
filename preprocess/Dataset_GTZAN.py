@@ -52,7 +52,7 @@ class GTZAN_3s(Dataset):
                  sample_splits_per_track: int = 100,
                  prob_augment: float = 0.5,
 
-                 augment_loudness: float = 0.0,
+                 augment_loudness: int = 0.0,
                  augment_noise: float = 0.0,
                  augment_pitch_shift: int = 0,
                  augment_time_stretch: float = 1.0,
@@ -123,7 +123,9 @@ class GTZAN_3s(Dataset):
                 wave = wave[:self.new_sr * 3]  # take only the first 3 seconds of the time stretched clip
 
         if self.augment_loudness != 0:
-            wave *= np.random.rand() * self.augment_loudness * 2 + 1 - self.augment_loudness
+            upper = pow(np.e, self.augment_loudness / 10)
+            lower = pow(np.e, -self.augment_loudness / 10)
+            wave *= np.random.rand() * (upper-lower) + lower
 
         if self.augment_noise != 0.0:
             wave += np.random.randn(len(wave)) * self.augment_noise
