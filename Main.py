@@ -40,6 +40,7 @@ def main():
     parser.add_argument('--num_workers', type=int, default=16)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--prob_augment', type=float, default=0.5)  # Probability to augment data
+    parser.add_argument('--num_cv', type=float, default=0.5)  # Probability to augment data
 
     # Settings need to be tuned
     parser.add_argument('--data', default='GTZAN')
@@ -83,12 +84,12 @@ def main():
     data_getter = getter_dataloader(opt)
     opt.num_label = get_num_label(opt.data, opt.enable_data_filtered)
 
-    cv_acc = np.zeros(10)
-    cv_loss = np.zeros(10)
-    cv_acc_voting = np.zeros(10)
+    cv_acc = np.zeros(opt.num_cv)
+    cv_loss = np.zeros(opt.num_cv)
+    cv_acc_voting = np.zeros(opt.num_cv)
 
     """ Iterate 10 folds """
-    for fold in range(10):
+    for fold in range(opt.num_cv):
         print("\n------------------------ Start fold:{fold} ------------------------\n".format(fold=fold))
         with open(opt.log, 'a') as f:
             f.write("\n------------------------ Start fold:{fold} ------------------------\n".format(fold=fold), )
