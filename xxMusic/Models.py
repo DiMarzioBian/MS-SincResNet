@@ -10,7 +10,7 @@ from xxMusic.Metrics import LabelSmoothingLoss
 from xxMusic.center_loss import CenterLoss
 from xxMusic.triplet_loss import TripletLoss
 
-
+from xxMusic.attention import Attention, Self_Attn
 class SincConv_fast(nn.Module):
     """Sinc-based convolution
     Parameters
@@ -145,7 +145,9 @@ class SpatialPyramidPool2D(nn.Module):
 class SPP_Resnet(nn.Module):
     def __init__(self, num_label, pretrained=True, enable_spp=True):
         super(SPP_Resnet, self).__init__()
-
+        self.attn = Attention()
+        #passing num heads10
+        self.attn1 = Self_Attn(10)
         if enable_spp:
             arch = list(models.resnet18(pretrained=pretrained).children())
             self.model = nn.Sequential(
@@ -158,9 +160,14 @@ class SPP_Resnet(nn.Module):
         else:
             self.model = models.resnet18(pretrained=pretrained)
             self.model.fc = nn.Linear(512, num_label, bias=True)
+        self.modelfc2 = nn.Linear(2000, 10, bias=True)
 
     def forward(self, x):
         x = self.model(x)
+        out = self.attn1(x)[0]
+        out = out.view(out.size(0), out.size(2), -1)
+        x = out.view(out.size(0), -1)
+        x = self.modelfc2(x)
         return x
 
 
@@ -171,7 +178,7 @@ class xxMusic(nn.Module):
         self.enable_spp = opt.enable_spp
         self.num_label = opt.num_label
         self.loss_type = opt.loss_type
-        self.CenterLoss_lambda = opt.CenterLoss_lambda
+        self.lambda_centerloss = opt.lambda_centerloss
 
         self.layerNorm = nn.LayerNorm([1, 3*opt.sample_rate])
         self.sincNet1 = nn.Sequential(
@@ -195,7 +202,7 @@ class xxMusic(nn.Module):
         if self.loss_type == 'CenterLoss':
             self.calc_loss2 = CenterLoss(num_classes=opt.num_label, feat_dim=10, device=opt.device)
         elif self.loss_type == 'TripletLoss':
-            self.calc_loss2 = TripletLoss(margin=opt.TripletLoss_margin, p=2., mining_type='all')
+            self.calc_loss2 = TripletLoss(margin=opt.triplet_margin, p=2., mining_type='all')
 
     def forward(self, x):
         """ Feature extraction """
@@ -217,7 +224,7 @@ class xxMusic(nn.Module):
         loss = self.calc_loss(score_pred, y_gt)
         if self.loss_type == 'CenterLoss':
             loss2 = self.calc_loss2(score_pred, y_gt)
-            loss = loss + self.CenterLoss_lambda * loss2
+            loss = loss + self.lambda_centerloss * loss2
         elif self.loss_type == 'TripletLoss':
             loss2 = self.calc_loss2(score_pred, y_gt)[0]
             loss = loss + loss2
