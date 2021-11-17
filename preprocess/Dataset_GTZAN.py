@@ -112,10 +112,7 @@ class GTZAN_3s(Dataset):
         if self.augment_pitch_shift != 0:
             if np.random.rand() <= self.prob_augment:
                 x = np.random.rand() * self.augment_pitch_shift * 2 - self.augment_pitch_shift
-                if x >= 0.0:
-                    wave = pitch_shift(wave, self.new_sr, np.ceil(x))
-                else:
-                    wave = pitch_shift(wave, self.new_sr, np.floor(x))
+                wave = pitch_shift(wave, self.new_sr, x)
 
         if self.augment_time_stretch < 1.0:
             if np.random.rand() <= self.prob_augment:

@@ -48,12 +48,12 @@ def main():
     parser.add_argument('--TripletLoss_margin', default=0.1)  # If TripletLoss is chosen as loss type
     parser.add_argument('--CenterLoss_lambda', default=1e-2)  # Lambda for CenterLoss
 
-    parser.add_argument('--augment_loudness', type=int, default=0)  # ± decibel
+    parser.add_argument('--augment_loudness', type=float, default=0.3)  # ± decibel
     parser.add_argument('--augment_noise', type=float, default=0.0)  # 0.001 stands for ± 0.001 white Gaussian noise
     parser.add_argument('--augment_pitch_shift', type=int, default=0.0)  # Pitch shifting, put 1 as ±1
     parser.add_argument('--augment_time_stretch', type=float, default=1.0)  # stretch strength, original speed is 1.0
 
-    parser.add_argument('--augment_loudness_test', type=int, default=0)
+    parser.add_argument('--augment_loudness_test', type=float, default=0)
     parser.add_argument('--augment_noise_test', type=float, default=0.0)
     parser.add_argument('--augment_pitch_shift_test', type=int, default=0.0)
     parser.add_argument('--augment_time_stretch_test', type=float, default=1.0)
