@@ -9,10 +9,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import torchaudio
 
-track_dict = pickle.load(open('_data/FMA_small/track_genre.pkl', 'rb'))
 
-
-def load_FMA_small_item(filename: str, path: str) -> Tuple[torch.Tensor, int, str]:
+def load_FMA_small_item(track_dict: dict, filename: str, path: str) -> Tuple[torch.Tensor, int, str]:
     """
     Loads a file from the dataset and returns the raw waveform
     as a Torch Tensor, its sample rate as an integer, and its
@@ -38,7 +36,8 @@ class FMA_small_3s(Dataset):
         """
         Instancelize FMA small, indexing clips by enlarged indices and map label to integers.
         """
-        self._walker = list(track_dict.keys())
+        self.track_dict = pickle.load(open('_data/FMA_small/track_genre.pkl', 'rb'))
+        self._walker = list(self.track_dict.keys())
 
         self.root = root
         # self.old_sr = 22050
@@ -70,7 +69,7 @@ class FMA_small_3s(Dataset):
         index_full, index_table_split = divmod(index, self.sample_splits_per_track)
         index_split = self.table_random[index_full][index_table_split]
 
-        wave, sr, genre_str = load_FMA_small_item(self._walker[index_full], self.root)
+        wave, sr, genre_str = load_FMA_small_item(self.track_dict, self._walker[index_full], self.root)
         wave = signal.resample(wave.mean(0).detach().numpy(), self.new_sr * 30)
 
         start = int((3+self.hop_gap) * index_split * self.new_sr)
@@ -123,5 +122,6 @@ def get_FMA_small_dataloader(opt: argparse.Namespace, train_list: list, val_list
 
 def get_FMA_small_labels(list_filename):
     """ Return filtered_all file genre """
+    track_dict = pickle.load(open('_data/FMA_small/track_genre.pkl', 'rb'))
     return torch.IntTensor(list(track_dict.values()))
 
