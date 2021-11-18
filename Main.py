@@ -60,7 +60,7 @@ def main():
 
     opt = parser.parse_args()
     opt.log = '_result/log/v' + opt.version + time.strftime("-%b_%d_%H_%M", time.localtime()) + '.txt'
-    opt.device = torch.device('cuda:0')
+    opt.device = torch.device('cuda')
     torch.backends.cudnn.benchmark = True
 
     # Download dataset
