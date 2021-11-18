@@ -18,8 +18,8 @@ def main():
     Preparation
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--version', type=str, default='2.2')
-    parser.add_argument('--note', type=str, default='Full augmentation test.')
+    parser.add_argument('--version', type=str, default='2.3')
+    parser.add_argument('--note', type=str, default='Final Edition.')
 
     parser.add_argument('--is_distributed', type=bool, default=False)
     parser.add_argument('--download', default=True)  # Download dataset
