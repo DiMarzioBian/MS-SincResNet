@@ -156,12 +156,12 @@ def get_GTZAN_dataloader(opt: argparse.Namespace, train_list: list, val_list: li
 
     # Instancelize dataset
     train_data = GTZAN_3s(list_filename=train_list, new_sr=opt.sample_rate, hop_gap=opt.hop_gap,
-                          sample_splits_per_track=opt.sample_splits_per_track,
+                          sample_splits_per_track=opt.sample_splits_per_track, prob_augment=opt.prob_augment,
                           augment_loudness=augment_loudness, augment_noise=augment_noise,
                           augment_pitch_shift=augment_pitch_shift, augment_time_stretch=augment_time_stretch)
 
     val_data = GTZAN_3s(list_filename=val_list, new_sr=opt.sample_rate, hop_gap=opt.hop_gap,
-                        sample_splits_per_track=opt.sample_splits_per_track,
+                        sample_splits_per_track=opt.sample_splits_per_track, prob_augment=opt.prob_augment,
                         augment_loudness=augment_loudness_test, augment_noise=augment_noise_test,
                         augment_pitch_shift=augment_pitch_shift_test, augment_time_stretch=augment_time_stretch_test)
 

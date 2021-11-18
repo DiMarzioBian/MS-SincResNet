@@ -18,7 +18,7 @@ def main():
     Preparation
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--version', type=str, default='2.3')
+    parser.add_argument('--version', type=str, default='2.3.1')
     parser.add_argument('--note', type=str, default='Final Edition.')
 
     parser.add_argument('--is_distributed', type=bool, default=False)
@@ -39,7 +39,7 @@ def main():
     parser.add_argument('--enable_data_filtered', type=bool, default=False)  # Enable data filtering
     parser.add_argument('--num_workers', type=int, default=16)
     parser.add_argument('--batch_size', type=int, default=8)
-    parser.add_argument('--prob_augment', type=float, default=0.5)  # Probability to augment data
+    parser.add_argument('--prob_augment', type=float, default=10)  # Probability to augment data
     parser.add_argument('--num_cv', type=int, default=1)  # Probability to augment data
 
     # Settings need to be tuned
