@@ -5,7 +5,7 @@ Link: https://dl.acm.org/doi/abs/10.1145/3460426.3463619
 
 ### This repo inherits the implementation of the MGC model proposed in a recent paper - MS-SincResNet - https://arxiv.org/abs/2109.08910. We also apply various augmentation strategies and combination of center and label smoothing losses to achieve better test accuracy. Additionally, we have also extended our model on Extended Ballroom Dataset and FMA dataset.  
 
-##Setup 
+### Setup 
 
 1. Make sure you have python 3.6 and above
 2. Run below command to install dependencies
