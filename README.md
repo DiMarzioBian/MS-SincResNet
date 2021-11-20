@@ -8,7 +8,7 @@ Link: https://dl.acm.org/doi/abs/10.1145/3460426.3463619
 ### Setup 
 
 1. Make sure you have python 3.6 and above
-2. Run below command to install dependencies
+2. Run below command to install dependencies </br>
    pip install -r requirements.txt
 
 Running on single GPU:
