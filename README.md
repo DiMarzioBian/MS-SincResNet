@@ -35,5 +35,9 @@ bash run.sh
     wget https://os.unil.cloud.switch.ch/fma/fma_metadata.zip
     python make_label_FMA_small.py
     ```
+    
+### Link
+Official implementation of the original paper: https://github.com/PeiChunChang/MS-SincResNet
+
 ### Known issue
-Console logging is messy when running multiple GPUs, temporarily unavailable.
+Multiple GPUs currently unavailable.
